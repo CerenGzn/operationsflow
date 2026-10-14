@@ -1,0 +1,34 @@
+server:
+  address: ${SERVER_ADDRESS:127.0.0.1}
+spring:
+  application:
+    name: operationsflow
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: operationsflow
+  flyway:
+    default-schema: public
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
