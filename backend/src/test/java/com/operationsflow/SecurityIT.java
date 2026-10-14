@@ -184,6 +184,18 @@ class SecurityIT {
         long events=auditCount("INVENTORY_RECEIPT");assertThatThrownBy(()->new TransactionTemplate(transactions).execute(tx->{inventory.receive(UUID.randomUUID(),new InventoryContracts.Receipt(warehouse,sku,5,"Rolled back receipt"));throw new IllegalStateException("Rollback");})).isInstanceOf(IllegalStateException.class);
         assertThat(auditCount("INVENTORY_RECEIPT")).isEqualTo(events);assertThat(jdbc.queryForObject("select on_hand from operationsflow.inventory_balance where warehouse_id=? and sku_id=?",Long.class,warehouse,sku)).isEqualTo(3);
     }
+    @Test void invalidCsrfAndDisabledOrUnknownAccountsCannotEstablishSessions()throws Exception{
+        var t=token(null);
+        mvc.perform(post("/api/v1/auth/login").session(t.session()).header(t.header(),"forged-token").contentType("application/json").content(json.writeValueAsString(Map.of("email",admin.email(),"password",PASSWORD))))
+            .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("CSRF_INVALID"));
+        jdbc.update("update operationsflow.app_user set active=false where id=?",admin.id());
+        for(String email:List.of(admin.email(),"unknown-"+UUID.randomUUID()+"@example.invalid")){
+            mvc.perform(post("/api/v1/auth/login").session(t.session()).header(t.header(),t.value()).contentType("application/json").content(json.writeValueAsString(Map.of("email",email,"password",PASSWORD))))
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("$.detail").value("Invalid email or password."));
+        }
+        assertThat(t.session().getAttribute("SPRING_SECURITY_CONTEXT")).isNull();
+    }
+
     @Test void bootstrapCannotCreateAnotherAdministratorAfterInitialization()throws Exception{
         assertThatThrownBy(()->identities.bootstrap("bootstrap@example.invalid",PASSWORD)).isInstanceOf(IllegalStateException.class).hasMessageContaining("empty user table");
     }
