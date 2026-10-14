@@ -101,7 +101,7 @@ export function InventoryPage() {
     } catch (err) { setMutationError((err as Error).message); }
     finally { inflight.current = false; setBusy(false); }
   }
-  function changeTab(next: Tab) { setData(null); setLoading(true); setError(''); setTab(next); setPage(0); }
+  function changeTab(next: Tab) { if (next === tab) return; setData(null); setLoading(true); setError(''); setTab(next); setPage(0); }
   const skuLabel = (id: string) => skus.find(s => s.id === id)?.code ?? id;
   const warehouseLabel = (id: string) => warehouses.find(w => w.id === id)?.code ?? id;
 
