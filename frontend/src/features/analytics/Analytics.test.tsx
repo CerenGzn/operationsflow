@@ -39,9 +39,13 @@ describe('operational dashboard', () => {
   it('shows an actionable error and retries without invented KPI values', async () => {
     vi.mocked(request).mockRejectedValueOnce(new Error('API unavailable')).mockResolvedValue(dashboard()); render(<DashboardPage />); expect(await screen.findByRole('alert')).toHaveTextContent('API unavailable'); expect(screen.queryByText('Total orders')).not.toBeInTheDocument(); fireEvent.click(screen.getByRole('button', { name: 'Retry dashboard' })); expect(await screen.findByText('Total orders')).toBeInTheDocument();
   });
+  it('does not equate zero net movement with no activity', () => {
+    render(<Chart title="Net movement" description="Signed deltas" data={[{ label: '2026-03-29', value: '0', secondary: '0' }]} primary="On hand" secondary="Reserved" trend />);
+    expect(screen.getByText('All plotted values are zero for this selection.')).toBeInTheDocument(); expect(screen.queryByText('No activity for this selection.')).not.toBeInTheDocument();
+  });
   it('renders signed net trends and retains precise values in the chart table', () => {
     render(<Chart title="Net changes" description="Signed units" data={[{ label: '2026-03-29', value: '-3', secondary: '2' }]} primary="On hand" secondary="Reserved" trend />);
-    expect(screen.getByRole('img', { name: 'Net changes' })).toBeInTheDocument(); expect(screen.getByText('-3')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Net changes' })).toBeInTheDocument(); expect(screen.getByText('-3', { selector: 'td' })).toBeInTheDocument();
     expect(validateRange({ ...range, from: '2025-01-01' })).toBe(false); expect(validateRange(range)).toBe(true);
   });
 });

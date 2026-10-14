@@ -29,9 +29,9 @@ public class AnalyticsStore {
             """,Map.of("threshold",threshold),(r,n)->{var result=new LinkedHashMap<String,String>();for(int i=1;i<=r.getMetaData().getColumnCount();i++)result.put(r.getMetaData().getColumnLabel(i),r.getString(i));return result;});
     }
     private List<Point> points(String sql,Map<String,Object> p){return jdbc.query(sql,p,(r,n)->new Point(r.getString("label"),r.getString("value"),r.getString("secondary")));}
-    private static final String DAYS="with days as (select generate_series(cast(:from as timestamp),cast(:to as timestamp),interval '1 day')::date day), values_by_day as (";
-    private static final String DAILY_END=") select d.day::text label,coalesce(v.value,0)::text value,coalesce(v.secondary,0)::text secondary from days d left join values_by_day v on v.day=d.day order by d.day";
-    public List<Point> orderVolume(Map<String,Object> p){return points(DAYS+"select timezone(:zone,created_at)::date day,count(*) value,0 secondary from operationsflow.sales_order where created_at>=:start and created_at<:end group by 1"+DAILY_END,p);}
+    private static final String DAYS="with days as (select generate_series(cast(:from as timestamp),cast(:to as timestamp),interval '1 day')::date AS bucket_day), values_by_day as (";
+    private static final String DAILY_END=") select d.bucket_day::text label,coalesce(v.value,0)::text value,coalesce(v.secondary,0)::text secondary from days d left join values_by_day v on v.bucket_day=d.bucket_day order by d.bucket_day";
+    public List<Point> orderVolume(Map<String,Object> p){return points(DAYS+"select timezone(:zone,created_at)::date AS bucket_day,count(*) value,0 secondary from operationsflow.sales_order where created_at>=:start and created_at<:end group by 1"+DAILY_END,p);}
     public List<Point> orderStatus(Map<String,Object> p){return points("""
         select labels.state label,count(o.id)::text value,'0' secondary from
         (values ('RESERVED',1),('PROCESSING',2),('READY_TO_SHIP',3),('SHIPPED',4),('CANCELLED',5)) labels(state,position)
@@ -45,8 +45,8 @@ public class AnalyticsStore {
         select case when position<=12 then code else 'Other warehouses' end label,sum(on_hand)::text value,sum(reserved)::text secondary
         from ranked group by case when position<=12 then code else 'Other warehouses' end order by min(position)
         """,Map.of());}
-    public List<Point> movements(Map<String,Object> p){return points(DAYS+"select timezone(:zone,created_at)::date day,sum(on_hand_delta) value,sum(reserved_delta) secondary from operationsflow.inventory_movement where created_at>=:start and created_at<:end group by 1"+DAILY_END,p);}
-    public List<Point> throughput(Map<String,Object> p){return points(DAYS+"select timezone(:zone,dispatched_at)::date day,count(*) value,0 secondary from operationsflow.shipment where dispatched_at>=:start and dispatched_at<:end group by 1"+DAILY_END,p);}
+    public List<Point> movements(Map<String,Object> p){return points(DAYS+"select timezone(:zone,created_at)::date AS bucket_day,sum(on_hand_delta) value,sum(reserved_delta) secondary from operationsflow.inventory_movement where created_at>=:start and created_at<:end group by 1"+DAILY_END,p);}
+    public List<Point> throughput(Map<String,Object> p){return points(DAYS+"select timezone(:zone,dispatched_at)::date AS bucket_day,count(*) value,0 secondary from operationsflow.shipment where dispatched_at>=:start and dispatched_at<:end group by 1"+DAILY_END,p);}
     public List<Point> fulfillmentStatus(Map<String,Object> p){return points("""
         select labels.state label,count(t.id)::text value,'0' secondary from
         (values ('PENDING',1),('PICKING',2),('PICKED',3),('PACKED',4),('READY_TO_SHIP',5),('DISPATCHED',6),('CANCELLED',7)) labels(state,position)
