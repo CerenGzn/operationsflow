@@ -168,3 +168,7 @@ See [Milestone 4 design, API and verification](docs/milestone-4.md).
 ## Authentication and access control (Milestone 5)
 
 Operations now require a server-side authenticated session. See [Milestone 5 security guide](docs/milestone-5.md) for the one-time administrator bootstrap, permission matrix, user/password workflows, CSRF API usage, audit attribution and local/production limitations. There are no default accounts or public signup. Existing unauthenticated curl examples require a session cookie and CSRF header for writes.
+
+## Warehouse fulfillment (Milestone 6)
+
+The Fulfillment workspace supports warehouse picking, verified packing, carrier/tracking records and atomic whole-order dispatch. Warehouses prepare independently; stock is consumed only when the complete order is dispatched. See [the fulfillment guide](docs/milestone-6.md) for lifecycle, cancellation rules, lock ordering, permissions and deliberate partial-shipment limitations.

@@ -43,6 +43,9 @@ public class OrderStore {
         if (jdbc.queryForList("select id from operationsflow.sales_order where id = ? for update",UUID.class,id).isEmpty())
             throw new BusinessException("NOT_FOUND","Order not found.");
     }
+    public void transition(UUID id, OrderStatus status) {
+        jdbc.update("update operationsflow.sales_order set status=?,version=version+1,updated_at=clock_timestamp() where id=?",status.name(),id);
+    }
     public void cancel(UUID id, String reason) {
         jdbc.update("update operationsflow.sales_order set status = 'CANCELLED', cancellation_reason = ?, version = version + 1, updated_at = clock_timestamp() where id = ?",reason,id);
     }

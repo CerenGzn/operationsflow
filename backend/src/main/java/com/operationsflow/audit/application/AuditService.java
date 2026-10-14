@@ -13,6 +13,8 @@ public class AuditService {
     @Transactional(propagation=Propagation.MANDATORY)
     public void record(String action,UUID target) { insert(CurrentActor.id(),"USER",action,target,""); }
     @Transactional(propagation=Propagation.MANDATORY)
+    public void record(String action,UUID target,String detail) { insert(CurrentActor.id(),"USER",action,target,detail); }
+    @Transactional(propagation=Propagation.MANDATORY)
     public void userChange(String action,UUID target,String detail) { insert(CurrentActor.id(),"USER",action,target,detail); }
     @Transactional(propagation=Propagation.MANDATORY)
     public void bootstrap(UUID target) { insert(null,"SYSTEM","ADMIN_BOOTSTRAPPED",target,""); }

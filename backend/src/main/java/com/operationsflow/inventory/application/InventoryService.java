@@ -68,6 +68,11 @@ public class InventoryService {
     public ReservationView releaseForOrder(UUID orderId, UUID reservationId, Terminal request) {
         return finish(reservationId, request, ReservationState.RELEASED, Objects.requireNonNull(orderId));
     }
+    /** Whole-order dispatch only; caller must hold the owning order lock. */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public ReservationView consumeForOrder(UUID orderId, UUID reservationId, Terminal request) {
+        return finish(reservationId, request, ReservationState.CONSUMED, Objects.requireNonNull(orderId));
+    }
     private ReservationView finish(UUID id, Terminal request, ReservationState target, UUID orderId) {
         store.limitLockWait();
         var state = store.lockReservation(id);

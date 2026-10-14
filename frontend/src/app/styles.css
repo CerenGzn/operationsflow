@@ -103,3 +103,15 @@ details { margin-top: 8px; font-size: .75rem; }summary { cursor: pointer; color:
 .auth-shell { min-height: 100vh; display: grid; place-content: center; padding: 24px; }
 .auth-card { width: min(100%, 470px); padding: 28px; margin: 24px auto; }.auth-card .brand-icon { display: inline-block; color: white; }.auth-card form { margin-top: 24px; }.auth-card .error { margin: 16px 0; }
 .session-actions { display: flex; gap: 8px; }.session-actions button { font-size: .75rem; }
+
+.fulfillment-detail { margin-top: 2rem; }
+.fulfillment-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); gap: 1rem; margin-top: 1rem; align-items: start; }
+.fulfillment-task { padding: 1.25rem; min-width: 0; }
+.fulfillment-task input[type="number"] { width: 6rem; }
+.fulfillment-task form { margin-top: 1.25rem; }
+.fulfillment-package { padding-top: 1rem; margin-top: 1rem; border-top: 1px solid var(--border, #e2e8f0); overflow-wrap: anywhere; }
+.fulfillment-package small { display: block; }
+.dispatch-panel { margin-top: 1rem; padding: 1.25rem; }
+.dispatch-panel button { margin-right: .75rem; }
+
+.fulfillment-destination { padding: 1.25rem; margin-bottom: 1rem; }
