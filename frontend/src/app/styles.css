@@ -83,3 +83,5 @@ footer { margin: 10px 32px 30px; color: #64788f; font-size: .72rem; }
 .terminal-form { border-top: 1px solid #dce4ed; padding-top: 10px; }
 details { margin-top: 8px; font-size: .75rem; }summary { cursor: pointer; color: #205d91; }
 @media (max-width: 1280px) { .inventory-layout { flex-direction: column; }.inventory-layout > .records-panel { width: 100%; }.inventory-editor { width: 100%; max-width: 620px; } }
+
+.owner-field { margin-bottom: 18px; }.owner-field small { display: block; margin-top: 6px; font-size: .72rem; color: #65788e; }
