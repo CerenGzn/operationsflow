@@ -83,8 +83,8 @@ describe('inventory workspace', () => {
     await screen.findByText('Stock operation recorded. Balances and history refreshed.');
     const created = fetchMock.mock.calls.find(([, opts]) => opts?.method === 'POST');
     expect(JSON.parse(created?.[1].body)).toMatchObject({ ownerReference: 'demo:order-1', lines: [{ warehouseId: 'w1', skuId: 's1', quantity: 4 }] });
-    fireEvent.click(screen.getByRole('button', { name: 'Reservations', exact: true }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Release', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Reservations' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Release' }));
     expect(fetchMock.mock.calls.some(([url]) => url.endsWith('/release'))).toBe(false);
     fireEvent.change(screen.getByLabelText('Transition reason'), { target: { value: 'Synthetic cancellation' } });
     fireEvent.click(screen.getByRole('button', { name: 'Confirm release' }));
