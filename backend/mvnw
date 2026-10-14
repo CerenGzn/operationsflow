@@ -1,0 +1,14 @@
+#!/bin/sh
+# Minimal POSIX launcher for the Apache Maven Wrapper (Linux and macOS).
+set -eu
+base=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+wrapper="$base/.mvn/wrapper/maven-wrapper.jar"
+if [ ! -s "$wrapper" ]; then
+  url=$(sed -n 's/^wrapperUrl=//p' "$base/.mvn/wrapper/maven-wrapper.properties")
+  tmp="$wrapper.tmp.$$"
+  trap 'rm -f "$tmp"' EXIT HUP INT TERM
+  curl --fail --location --connect-timeout 15 --max-time 120 "$url" --output "$tmp"
+  mv "$tmp" "$wrapper"
+fi
+if [ -n "${JAVA_HOME:-}" ]; then java_cmd="$JAVA_HOME/bin/java"; else java_cmd=java; fi
+exec "$java_cmd" "-Dmaven.multiModuleProjectDirectory=$base" -classpath "$wrapper" org.apache.maven.wrapper.MavenWrapperMain "$@"
