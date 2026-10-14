@@ -14,7 +14,7 @@ import com.operationsflow.shared.api.PageResponse;
 
 @RestController
 @RequestMapping("/api/v1/orders")
-@Tag(name = "Orders", description = "Unpriced orders with atomic allocation. Only RESERVED and CANCELLED are currently supported.")
+@Tag(name = "Orders", description = "Unpriced orders with atomic allocation. Independent warehouse preparation with whole-order dispatch. States: RESERVED, PROCESSING, READY_TO_SHIP, SHIPPED, CANCELLED.")
 public class OrderController {
     private final OrderService service;
     public OrderController(OrderService service) { this.service = service; }
@@ -34,6 +34,6 @@ public class OrderController {
     @GetMapping("/{id}") @Operation(summary="Read order snapshots and allocations")
     public View get(@PathVariable UUID id) { return service.get(id); }
     @PostMapping("/{id}/cancel")
-    @Operation(summary="Cancel a reserved order", description="Locks order and reservation; releases each allocation exactly once in the same transaction. A repeated cancellation returns the current cancelled order, preserving the first reason. Other transitions return 409.")
+    @Operation(summary="Cancel an unshipped order", description="Locks order and reservation; releases each allocation exactly once in the same transaction. A repeated cancellation returns the current cancelled order, preserving the first reason. Prepared fulfillment tasks and shipments are cancelled in the same transaction; SHIPPED returns 409.")
     public View cancel(@PathVariable UUID id, @Valid @RequestBody Cancel request) { return service.cancel(id,request); }
 }

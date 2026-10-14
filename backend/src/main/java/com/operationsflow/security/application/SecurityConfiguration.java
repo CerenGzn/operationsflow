@@ -38,6 +38,8 @@ public class SecurityConfiguration {
             .requestMatchers(HttpMethod.GET,"/api/v1/system","/api/v1/products/**","/api/v1/warehouses/**","/api/v1/orders/**","/api/v1/inventory/balances","/api/v1/inventory/availability").hasAnyRole("ADMIN","WAREHOUSE_OPERATOR","SALES_OPERATOR")
             .requestMatchers("/api/v1/products/**","/api/v1/warehouses/**").hasRole("ADMIN")
             .requestMatchers("/api/v1/customers/**","/api/v1/orders/**").hasAnyRole("ADMIN","SALES_OPERATOR")
+            .requestMatchers(HttpMethod.GET,"/api/v1/fulfillment/**").hasAnyRole("ADMIN","WAREHOUSE_OPERATOR","SALES_OPERATOR")
+            .requestMatchers("/api/v1/fulfillment/**").hasAnyRole("ADMIN","WAREHOUSE_OPERATOR")
             .requestMatchers("/api/v1/inventory/**").hasAnyRole("ADMIN","WAREHOUSE_OPERATOR")
             .anyRequest().denyAll());
         http.addFilterBefore(new SessionValidityFilter(users),AuthorizationFilter.class);

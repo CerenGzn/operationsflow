@@ -214,7 +214,7 @@ class SecurityIT {
         UUID order=UUID.fromString(json.readTree(created.getResponse().getContentAsString()).get("id").asText());
         mvc.perform(post("/api/v1/orders").session(sales).header(t.header(),t.value()).header("Idempotency-Key",key).contentType("application/json").content(body)).andExpect(status().isCreated());
         for(int i=0;i<2;i++)assertThat(mutate(sales,"POST","/api/v1/orders/"+order+"/cancel",Map.of("reason","Synthetic cancellation")).getResponse().getStatus()).isEqualTo(200);
-        assertThat(jdbc.queryForList("select actor_id from operationsflow.audit_event where target_id=? order by action",UUID.class,order)).containsExactly(seller.id(),seller.id());
+        assertThat(jdbc.queryForList("select actor_id from operationsflow.audit_event where target_id=? and action in ('ORDER_CREATED','ORDER_CANCELLED') order by action",UUID.class,order)).containsExactly(seller.id(),seller.id());
         assertThat(jdbc.queryForList("select actor from operationsflow.inventory_movement where sku_id=? and type in ('RESERVATION','RELEASE')",String.class,sku)).containsExactly("user:"+seller.id(),"user:"+seller.id());
         assertThat(jdbc.queryForObject("select reserved from operationsflow.inventory_balance where sku_id=?",Long.class,sku)).isZero();
     }

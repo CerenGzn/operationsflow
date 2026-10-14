@@ -58,6 +58,6 @@ public class InventoryController {
     @GetMapping("/reservations/{id}") public ReservationView reservation(@PathVariable UUID id) { return queries.reservation(id); }
     @PostMapping("/reservations/{id}/release") @Operation(summary = "Release stock exactly once", description = "ACTIVE -> RELEASED. Repeating RELEASED returns current reservation without another stock effect. CONSUMED returns 409. No separate idempotency key is needed. Order-owned reservations return 409 ORDER_MANAGED; cancel through Orders.")
     public ReservationView release(@PathVariable UUID id, @Valid @RequestBody Terminal request) { return service.release(id, request); }
-    @PostMapping("/reservations/{id}/consume") @Operation(summary = "Consume reserved stock exactly once", description = "Inventory fulfillment primitive only: ACTIVE -> CONSUMED deducts both on-hand and reserved. Repeating CONSUMED is a no-op; RELEASED returns 409. Order-owned reservations return 409 ORDER_MANAGED; order fulfillment is not implemented.")
+    @PostMapping("/reservations/{id}/consume") @Operation(summary = "Consume reserved stock exactly once", description = "Inventory fulfillment primitive only: ACTIVE -> CONSUMED deducts both on-hand and reserved. Repeating CONSUMED is a no-op; RELEASED returns 409. Order-owned reservations return 409 ORDER_MANAGED; dispatch through the Fulfillment API.")
     public ReservationView consume(@PathVariable UUID id, @Valid @RequestBody Terminal request) { return service.consume(id, request); }
 }

@@ -28,9 +28,10 @@ class OrderRulesTest {
         assertThatThrownBy(() -> OrderAllocator.allocate(List.of(new Demand(sku,1)),List.of(first),List.of())).isInstanceOf(BusinessException.class);
         assertThatThrownBy(() -> OrderAllocator.allocate(List.of(new Demand(sku,1)),List.of(),List.of())).isInstanceOf(BusinessException.class);
     }
-    @Test void cancellationIsIdempotentAndFutureStatesAreNotCancellable() {
+    @Test void cancellationAllowsUnshippedWorkButNeverShippedStock() {
         assertThat(OrderStatus.RESERVED.cancel()).isTrue(); assertThat(OrderStatus.CANCELLED.cancel()).isFalse();
-        for (var state : List.of(OrderStatus.PROCESSING,OrderStatus.PARTIALLY_SHIPPED,OrderStatus.SHIPPED))
+        assertThat(OrderStatus.PROCESSING.cancel()).isTrue(); assertThat(OrderStatus.READY_TO_SHIP.cancel()).isTrue();
+        for (var state : List.of(OrderStatus.PARTIALLY_SHIPPED,OrderStatus.SHIPPED))
             assertThatThrownBy(state::cancel).isInstanceOf(BusinessException.class);
     }
 }
