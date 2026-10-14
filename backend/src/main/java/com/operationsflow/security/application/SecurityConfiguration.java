@@ -41,6 +41,9 @@ public class SecurityConfiguration {
             .requestMatchers(HttpMethod.GET,"/api/v1/fulfillment/**").hasAnyRole("ADMIN","WAREHOUSE_OPERATOR","SALES_OPERATOR")
             .requestMatchers("/api/v1/fulfillment/**").hasAnyRole("ADMIN","WAREHOUSE_OPERATOR")
             .requestMatchers("/api/v1/inventory/**").hasAnyRole("ADMIN","WAREHOUSE_OPERATOR")
+            .requestMatchers(HttpMethod.GET,"/api/v1/reports/audit","/api/v1/reports/audit/export").hasRole("ADMIN")
+            .requestMatchers(HttpMethod.GET,"/api/v1/reports/movements","/api/v1/reports/movements/export").hasAnyRole("ADMIN","WAREHOUSE_OPERATOR")
+            .requestMatchers(HttpMethod.GET,"/api/v1/analytics/dashboard","/api/v1/reports/**").hasAnyRole("ADMIN","WAREHOUSE_OPERATOR","SALES_OPERATOR")
             .anyRequest().denyAll());
         http.addFilterBefore(new SessionValidityFilter(users),AuthorizationFilter.class);
         http.headers(h->h.contentSecurityPolicy(c->c.policyDirectives("default-src 'self'; frame-ancestors 'none'; object-src 'none'"))

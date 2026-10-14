@@ -1,0 +1,19 @@
+import { useId } from 'react';
+import { integer, type Point } from './types';
+
+/** Dependency-free SVG charts with exact-value tables; numbers are converted only for visual scaling. */
+export function Chart({ title, description, data, primary, secondary, trend = false, secondaryPlot = true }: { title: string; description: string; data: Point[]; primary: string; secondary?: string; trend?: boolean; secondaryPlot?: boolean }) {
+  const id = useId(); const paired = Boolean(secondary) && secondaryPlot;
+  const values = data.flatMap(d => paired ? [Number(d.value), Number(d.secondary)] : [Number(d.value)]);
+  const empty = !data.length || values.every(v => v === 0); const min = Math.min(0, ...values); const max = Math.max(1, ...values); const span = max - min || 1;
+  const y = (v: number) => 158 - (v - min) / span * 128;
+  const x = (i: number) => 54 + i / Math.max(1, data.length - 1) * 570;
+  const points = (second: boolean) => data.map((d, i) => `${x(i)},${y(Number(second ? d.secondary : d.value))}`).join(' ');
+  const compact = (n: number) => new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(n);
+  return <section className="panel analytics-chart" aria-labelledby={id}>
+    <div className="chart-heading"><h2 id={id}>{title}</h2><p className="muted">{description}</p></div>
+    {empty ? <p className="chart-empty">No activity for this selection.</p> : trend ? <svg role="img" aria-label={title} viewBox="0 0 660 190" className="trend-chart"><title>{title}. Exact values are available in the data table.</title><line x1="54" x2="624" y1={y(0)} y2={y(0)} className="chart-gridline" /><line x1="54" x2="624" y1="30" y2="30" className="chart-gridline" /><text x="4" y="34">{compact(max)}</text><text x="4" y="158">{compact(min)}</text><polyline points={points(false)} className="chart-line primary-line" />{paired && <polyline points={points(true)} className="chart-line secondary-line" />}{data.map((d, i) => <circle key={d.label} cx={x(i)} cy={y(Number(d.value))} r={data.length > 90 ? 1.5 : 3} className="primary-dot"><title>{d.label}: {primary} {integer(d.value)}{secondary ? `; ${secondary} ${integer(d.secondary)}` : ''}</title></circle>)}{[0, Math.floor((data.length - 1) / 2), data.length - 1].filter((v, i, all) => all.indexOf(v) === i).map(i => <text key={i} x={x(i)} y="181" textAnchor={i === 0 ? 'start' : i === data.length - 1 ? 'end' : 'middle'}>{data[i].label.slice(5)}</text>)}</svg> : <svg role="img" aria-label={title} viewBox={`0 0 660 ${Math.max(90, data.length * 36 + 15)}`} className="bar-chart"><title>{title}. Exact values are available in the data table.</title>{data.map((d, i) => <g key={d.label}><text x="0" y={i * 36 + 18}>{d.label.replaceAll('_', ' ').slice(0, 23)}</text><rect x="196" y={i * 36 + 5} width={Number(d.value) / max * 370} height={paired ? 10 : 18} rx="3" className="primary-bar"><title>{d.label}: {integer(d.value)} {primary}</title></rect>{paired && <rect x="196" y={i * 36 + 17} width={Number(d.secondary) / max * 370} height="8" rx="3" className="secondary-bar"><title>{d.label}: {integer(d.secondary)} {secondary}</title></rect>}<text x="580" y={i * 36 + 19}>{compact(Number(d.value))}</text></g>)}</svg>}
+    <div className="chart-legend"><span><i className="legend-primary" />{primary}</span>{paired && <span><i className="legend-secondary" />{secondary}</span>}</div>
+    <details className="chart-data"><summary>View data table — {title}</summary><div className="table-scroll"><table><caption className="sr-only">{title} exact values</caption><thead><tr><th>Period / category</th><th>{primary}</th>{secondary && <th>{secondary}</th>}</tr></thead><tbody>{data.map(d => <tr key={d.label}><td>{d.label.replaceAll('_', ' ')}</td><td>{integer(d.value)}</td>{secondary && <td>{integer(d.secondary)}</td>}</tr>)}</tbody></table></div></details>
+  </section>;
+}

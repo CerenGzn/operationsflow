@@ -172,3 +172,7 @@ Operations now require a server-side authenticated session. See [Milestone 5 sec
 ## Warehouse fulfillment (Milestone 6)
 
 The Fulfillment workspace supports warehouse picking, verified packing, carrier/tracking records and atomic whole-order dispatch. Warehouses prepare independently; stock is consumed only when the complete order is dispatched. See [the fulfillment guide](docs/milestone-6.md) for lifecycle, cancellation rules, lock ordering, permissions and deliberate partial-shipment limitations.
+
+## Analytics and operational reports (Milestone 7)
+
+Dashboard is the authenticated landing screen. It combines current operational KPIs with date-filtered charts; Reports provides filtered, paginated operational datasets and complete CSV exports capped at 5,000 rows. Sales users cannot access stock movements or audit reports. See [metric definitions and report semantics](docs/milestone-7.md) for time-zone boundaries, low-stock scope, CSV safety, permissions and performance limits. No revenue is inferred from unpriced orders.

@@ -32,7 +32,7 @@ class FulfillmentMigrationIT {
             jdbc.update("insert into operationsflow.inventory_movement(id,warehouse_id,sku_id,type,on_hand_delta,reserved_delta,on_hand_after,reserved_after,operation_id,reason,actor) values (?,?,?,'RECEIPT',5,0,5,0,?,'Synthetic legacy receipt','UNAUTHENTICATED')",UUID.randomUUID(),warehouse,sku,UUID.randomUUID());
             jdbc.update("insert into operationsflow.inventory_movement(id,warehouse_id,sku_id,type,on_hand_delta,reserved_delta,on_hand_after,reserved_after,reservation_id,operation_id,reason,actor) values (?,?,?,'RESERVATION',0,3,5,3,?,?,'Synthetic legacy reservation','UNAUTHENTICATED')",UUID.randomUUID(),warehouse,sku,reservation,UUID.randomUUID());
         });
-        var flyway=Flyway.configure().dataSource(ds).load();assertThat(flyway.migrate().migrationsExecuted).isEqualTo(1);assertThat(flyway.migrate().migrationsExecuted).isZero();
+        var flyway=Flyway.configure().dataSource(ds).target("6").load();assertThat(flyway.migrate().migrationsExecuted).isEqualTo(1);assertThat(flyway.migrate().migrationsExecuted).isZero();
         var task=jdbc.queryForMap("select * from operationsflow.fulfillment_task where order_id=?",order);assertThat(task.get("state")).isEqualTo("PENDING");assertThat(task.get("warehouse_id")).isEqualTo(warehouse);
         var line=jdbc.queryForMap("select * from operationsflow.fulfillment_line where order_id=?",order);assertThat(line.get("quantity")).isEqualTo(3L);assertThat(line.get("picked_quantity")).isEqualTo(0L);
         var balance=jdbc.queryForMap("select on_hand,reserved from operationsflow.inventory_balance");assertThat(balance.get("on_hand")).isEqualTo(5L);assertThat(balance.get("reserved")).isEqualTo(3L);

@@ -1,0 +1,4 @@
+import type { Range } from './types';
+export function DateControls({ value, onChange, disabled = false }: { value: Range; onChange: (value: Range) => void; disabled?: boolean }) {
+  return <><label>From date<input type="date" required disabled={disabled} min="1900-01-01" max="2100-12-31" value={value.from} onChange={e => onChange({ ...value, from: e.target.value })} /></label><label>To date<input type="date" required disabled={disabled} min={value.from || '1900-01-01'} max="2100-12-31" value={value.to} onChange={e => onChange({ ...value, to: e.target.value })} /></label><label>Reporting time zone<select disabled={disabled} value={value.zone} onChange={e => onChange({ ...value, zone: e.target.value })}><option value="Europe/Berlin">Europe/Berlin</option><option value="UTC">UTC</option></select></label></>;
+}
