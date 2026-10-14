@@ -71,3 +71,15 @@ footer { margin: 10px 32px 30px; color: #64788f; font-size: .72rem; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 @media (max-width: 1200px) { .management-grid { flex-direction: column; }.records-panel,.editor { width: 100%; }.editor { max-width: 620px; } }
 @media (max-width: 760px) { .app-shell { display: block; }.sidebar { width: 100%; padding: 16px; }.nav-label,.sidebar-note { display: none; }nav { display: flex; gap: 10px; margin-top: 16px; }nav button { padding: 10px; }nav button span { display: none; }.topbar { height: 50px; padding: 0 18px; }main { padding: 20px 14px; }.page-header { align-items: flex-start; flex-direction: column; }.toolbar { padding: 14px; }th,td { padding: 12px; }footer { margin: 20px 14px; } }
+
+.inventory-layout { display: flex; align-items: flex-start; gap: 24px; }
+.inventory-tabs { display: flex; flex-wrap: wrap; gap: 8px; padding: 18px 20px; border-bottom: 1px solid #e7ecf2; }
+.inventory-editor form > button { margin-top: 10px; }
+.stock-available { color: #24664b; }.stock-zero { color: #96602d; }
+.reservation-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.identifier { overflow-wrap: anywhere; word-break: break-word; }
+.pending-request { margin: 20px; padding: 14px; border: 1px solid #d8b76d; border-radius: 7px; background: #fff9eb; font-size: .8rem; }
+.pending-request code { display: block; margin-bottom: 10px; }
+.terminal-form { border-top: 1px solid #dce4ed; padding-top: 10px; }
+details { margin-top: 8px; font-size: .75rem; }summary { cursor: pointer; color: #205d91; }
+@media (max-width: 1280px) { .inventory-layout { flex-direction: column; }.inventory-layout > .records-panel { width: 100%; }.inventory-editor { width: 100%; max-width: 620px; } }
