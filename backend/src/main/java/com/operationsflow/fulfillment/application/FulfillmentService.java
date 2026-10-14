@@ -53,12 +53,12 @@ public class FulfillmentService {
     }
     public OrderView dispatch(UUID id){
         var order=orders.lock(id);var tasks=store.tasks(id);
-        if(order.status()==OrderStatus.SHIPPED)return new OrderView(id,order.orderNumber(),order.status(),tasks);
+        if(order.status()==OrderStatus.SHIPPED)return new OrderView(id,order.orderNumber(),order.status(),order.customer(),tasks);
         if(order.status()!=OrderStatus.READY_TO_SHIP || tasks.isEmpty() || tasks.stream().anyMatch(t->t.state()!=TaskState.READY_TO_SHIP))throw conflict("All warehouse allocations must have verified packages and prepared shipments before whole-order dispatch.");
         inventory.consumeForOrder(id,order.reservationId(),new Terminal("Whole-order dispatch "+order.orderNumber()));
         for(var task:tasks){store.ship(task.id());audit.record("SHIPMENT_DISPATCHED",task.shipment().id());}
         orders.transition(id,OrderStatus.SHIPPED);audit.record("ORDER_DISPATCHED",id);
-        return new OrderView(id,order.orderNumber(),OrderStatus.SHIPPED,store.tasks(id));
+        return new OrderView(id,order.orderNumber(),OrderStatus.SHIPPED,order.customer(),store.tasks(id));
     }
     private BusinessException conflict(String message){return new BusinessException("INVALID_TRANSITION",message);}
 }

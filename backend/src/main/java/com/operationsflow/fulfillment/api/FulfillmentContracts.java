@@ -19,5 +19,5 @@ public final class FulfillmentContracts {
     public record PackageView(UUID id,Instant packedAt) {}
     public record ShipmentView(UUID id,UUID taskId,UUID orderId,String orderNumber,UUID warehouseId,String warehouseCode,UUID packageId,String carrier,String trackingReference,String state,Instant createdAt,Instant dispatchedAt) {}
     public record TaskView(UUID id,UUID orderId,String orderNumber,UUID warehouseId,String warehouseCode,TaskState state,long version,List<LineView> lines,PackageView packageRecord,ShipmentView shipment) {}
-    public record OrderView(UUID orderId,String orderNumber,OrderStatus status,List<TaskView> tasks) {}
+    public record OrderView(UUID orderId,String orderNumber,OrderStatus status,com.operationsflow.orders.api.OrderContracts.CustomerSnapshot destination,List<TaskView> tasks) {}
 }

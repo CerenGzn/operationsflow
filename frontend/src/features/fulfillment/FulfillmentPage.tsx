@@ -6,7 +6,7 @@ interface Page<T> { content: T[]; totalElements: number; totalPages: number }
 interface Line { skuId: string; skuCode: string; productName: string; quantity: number; pickedQuantity: number }
 export interface Shipment { id: string; taskId: string; orderId: string; orderNumber: string; warehouseCode: string; packageId: string; carrier: string; trackingReference: string; state: string; createdAt: string; dispatchedAt: string | null }
 export interface Task { id: string; orderId: string; orderNumber: string; warehouseId: string; warehouseCode: string; state: State; version: number; lines: Line[]; packageRecord: { id: string; packedAt: string } | null; shipment: Shipment | null }
-interface Order { orderId: string; orderNumber: string; status: string; tasks: Task[] }
+interface Order { orderId: string; orderNumber: string; status: string; destination: { name: string; referenceNumber: string; addressLine: string; city: string; postalCode: string; countryCode: string }; tasks: Task[] }
 const taskStates: State[] = ['PENDING', 'PICKING', 'PICKED', 'PACKED', 'READY_TO_SHIP', 'DISPATCHED', 'CANCELLED'];
 const label = (value: string) => value.replaceAll('_', ' ');
 
@@ -76,6 +76,7 @@ export function FulfillmentPage({ readOnly = false }: { readOnly?: boolean }) {
     </div>
     {detailError && <p className="error" role="alert">{detailError}{detail && <button disabled={busy} onClick={() => void open(detail.orderId)}>Refresh order details</button>}</p>}
     {detail && <section className="fulfillment-detail" aria-label="Fulfillment order details"><div className="page-header"><div><h2>{detail.orderNumber}</h2><span className="badge">{label(detail.status)}</span></div><div className="input-row"><button disabled={busy} onClick={() => void open(detail.orderId)}>Refresh order details</button><button disabled={busy} onClick={() => { setDetail(null); setConfirmDispatch(false); setDetailError(''); }}>Close details</button></div></div>
+      <div className="panel fulfillment-destination"><h3>Shipping destination</h3><p><strong>{detail.destination.name}</strong> · {detail.destination.referenceNumber}<br />{detail.destination.addressLine}<br />{detail.destination.postalCode} {detail.destination.city}, {detail.destination.countryCode}</p><small>Order address snapshot. Carrier and tracking records apply to this destination.</small></div>
       <div className="notice">Each warehouse prepares its own allocation. All packages must be ready before this whole order can be dispatched. Picking and packing do not deduct stock.</div>
       <div className="fulfillment-grid">{detail.tasks.map(task => <TaskCard key={`${task.id}:${task.version}`} task={task} readOnly={readOnly} busy={busy} mutate={mutate} />)}</div>
       {!readOnly && detail.status === 'READY_TO_SHIP' && <div className="panel dispatch-panel">{!confirmDispatch ? <button className="primary" disabled={busy} onClick={() => setConfirmDispatch(true)}>Dispatch whole order</button> : <><h3>Confirm whole-order dispatch</h3><p>This dispatches every warehouse shipment and deducts all reserved stock. The order can no longer be cancelled.</p><button className="primary" disabled={busy} onClick={() => void mutate(`orders/${detail.orderId}/dispatch`, 'POST')}>Confirm dispatch</button><button disabled={busy} onClick={() => setConfirmDispatch(false)}>Keep preparing</button></>}</div>}

@@ -17,7 +17,7 @@ import com.operationsflow.shared.domain.BusinessException;
 public class FulfillmentQueries {
     private final FulfillmentStore store;private final OrderFulfillmentAccess orders;private final NamedParameterJdbcTemplate jdbc;
     public FulfillmentQueries(FulfillmentStore store,OrderFulfillmentAccess orders,NamedParameterJdbcTemplate jdbc){this.store=store;this.orders=orders;this.jdbc=jdbc;}
-    public OrderView order(UUID id){var order=orders.get(id);return new OrderView(id,order.orderNumber(),order.status(),store.tasks(id));}
+    public OrderView order(UUID id){var order=orders.get(id);return new OrderView(id,order.orderNumber(),order.status(),order.customer(),store.tasks(id));}
     public PageResponse<TaskView> tasks(UUID warehouse,TaskState state,String query,int page,int size){
         ListQuery.page(page,size,"id","asc",Set.of("id"));String term=ListQuery.search(query).toLowerCase(Locale.ROOT);
         var p=new HashMap<String,Object>();p.put("warehouse",warehouse);p.put("state",state==null?null:state.name());p.put("term",term);p.put("size",size);p.put("offset",(long)page*size);

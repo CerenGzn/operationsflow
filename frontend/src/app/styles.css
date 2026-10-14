@@ -113,3 +113,5 @@ details { margin-top: 8px; font-size: .75rem; }summary { cursor: pointer; color:
 .fulfillment-package small { display: block; }
 .dispatch-panel { margin-top: 1rem; padding: 1.25rem; }
 .dispatch-panel button { margin-right: .75rem; }
+
+.fulfillment-destination { padding: 1.25rem; margin-bottom: 1rem; }

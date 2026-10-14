@@ -9,7 +9,7 @@ function setup() {
   vi.mocked(request).mockImplementation(async (path, options) => {
     if (options?.method) return current;
     if (path.startsWith('warehouses?')) return { content: [{ id: 'warehouse-1', code: 'BER-01', name: 'Synthetic warehouse' }], totalElements: 1, totalPages: 1 };
-    if (path.startsWith('fulfillment/orders/')) return { orderId: 'order-1', orderNumber: 'OF-101', status, tasks: [current] };
+    if (path.startsWith('fulfillment/orders/')) return { orderId: 'order-1', orderNumber: 'OF-101', status, destination: { name: 'Synthetic business', referenceNumber: 'SYNTH-01', addressLine: 'Example 1', city: 'Berlin', postalCode: '10115', countryCode: 'DE' }, tasks: [current] };
     return { content: [current], totalElements: 1, totalPages: 1 };
   });
 }
@@ -17,7 +17,7 @@ beforeEach(() => { current = structuredClone(task); status = 'RESERVED'; vi.mock
 async function open() { fireEvent.click(await screen.findByRole('button', { name: 'Open OF-101 BER-01' })); await screen.findByRole('region', { name: 'Fulfillment order details' }); }
 describe('fulfillment workspace', () => {
   it('loads the live picking queue and confirms an absolute versioned quantity', async () => {
-    render(<FulfillmentPage />); await open(); fireEvent.change(screen.getByLabelText('Picked CHAIR-01'), { target: { value: '3' } }); fireEvent.click(screen.getByRole('button', { name: 'Confirm CHAIR-01' }));
+    render(<FulfillmentPage />); await open(); expect(screen.getByText('Synthetic business')).toBeInTheDocument(); fireEvent.change(screen.getByLabelText('Picked CHAIR-01'), { target: { value: '3' } }); fireEvent.click(screen.getByRole('button', { name: 'Confirm CHAIR-01' }));
     await waitFor(() => expect(request).toHaveBeenCalledWith('fulfillment/tasks/task-1/picks/sku-1', expect.objectContaining({ method: 'PUT', body: JSON.stringify({ quantity: 3, version: 0 }) })));
   });
   it('rejects picked quantities exceeding the allocation before calling the API', async () => {
