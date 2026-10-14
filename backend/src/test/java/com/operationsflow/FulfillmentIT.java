@@ -157,8 +157,43 @@ class FulfillmentIT extends AuthenticatedTestSupport {
     }
     @Test void fulfillmentAuditAndMovementsIdentifyTheActor(){
         var f=fixture(false);ready(f);fulfillment.dispatch(f.order());
+        assertThat(jdbc.queryForObject("select detail from operationsflow.audit_event where target_id=? and action='PICK_CONFIRMED'",String.class,task(f).id())).isEqualTo("sku="+f.sku()+";picked=0->5");
         assertThat(jdbc.queryForList("select actor_id from operationsflow.audit_event where target_id=? and action='ORDER_DISPATCHED'",UUID.class,f.order())).containsExactly(TEST_ADMIN);
         assertThat(jdbc.queryForList("select actor from operationsflow.inventory_movement where sku_id=? and type='FULFILLMENT'",String.class,f.sku())).containsExactly("user:"+TEST_ADMIN);
+    }
+    @Test void failureDuringSecondWarehouseDeductionRollsBackTheFirstMovementAndAudit(){
+        var f=fixture(true);ready(f);var second=queries.order(f.order()).tasks().getLast().warehouseId();long before=events();
+        jdbc.execute("""
+            create function operationsflow.synthetic_dispatch_failure() returns trigger language plpgsql as $$
+            begin
+                if NEW.type='FULFILLMENT' and NEW.warehouse_id::text=TG_ARGV[0] then
+                    if not exists(select 1 from operationsflow.inventory_movement where sku_id=NEW.sku_id and type='FULFILLMENT') then
+                        raise exception 'Expected the first warehouse movement before fault injection';
+                    end if;
+                    raise exception 'Synthetic second-warehouse failure' using errcode='23514';
+                end if;
+                return NEW;
+            end;
+            $$
+            """);
+        jdbc.execute("create trigger synthetic_dispatch_failure before insert on operationsflow.inventory_movement for each row execute function operationsflow.synthetic_dispatch_failure('"+second+"')");
+        try {
+            assertThatThrownBy(()->fulfillment.dispatch(f.order())).isInstanceOf(DataIntegrityViolationException.class);
+            assertThat(events()).isEqualTo(before);reconcile(f,8,7);
+            assertThat(jdbc.queryForObject("select count(*) from operationsflow.inventory_movement where sku_id=? and type='FULFILLMENT'",Long.class,f.sku())).isZero();
+            assertThat(queries.order(f.order()).tasks()).allMatch(t->t.state()==TaskState.READY_TO_SHIP && t.shipment().dispatchedAt()==null);
+        } finally {jdbc.execute("drop trigger synthetic_dispatch_failure on operationsflow.inventory_movement");jdbc.execute("drop function operationsflow.synthetic_dispatch_failure()");}
+    }
+    @Test void multipleSkusMustAllBePickedAndVerifiedBeforePacking(){
+        var base=fixture(false);var warehouse=task(base).warehouseId();var second=products.create(new ProductContracts.Create("Synthetic second item","","SECOND-"+UUID.randomUUID().toString().toUpperCase(Locale.ROOT))).skus().getFirst().id();
+        inventory.receive(UUID.randomUUID(),new InventoryContracts.Receipt(warehouse,second,4,"Synthetic second item receipt"));
+        var order=orders.create(UUID.randomUUID(),new OrderContracts.Create(orders.get(base.order()).customer().id(),List.of(new OrderContracts.Line(base.sku(),2),new OrderContracts.Line(second,3))));
+        var task=queries.order(order.id()).tasks().getFirst();assertThat(task.lines()).hasSize(2);
+        var first=fulfillment.pick(task.id(),base.sku(),new Pick(2L,task.version()));assertThat(first.state()).isEqualTo(TaskState.PICKING);
+        assertThatThrownBy(()->fulfillment.pack(first.id(),verification(first))).isInstanceOf(BusinessException.class);
+        var complete=fulfillment.pick(task.id(),second,new Pick(3L,first.version()));
+        assertThatThrownBy(()->fulfillment.pack(complete.id(),new Pack(complete.version(),List.of(new VerifiedLine(base.sku(),2))))).isInstanceOf(BusinessException.class);
+        assertThat(fulfillment.pack(complete.id(),verification(complete)).state()).isEqualTo(TaskState.PACKED);
     }
     private org.springframework.security.core.Authentication identity(Role role){UUID id=UUID.randomUUID();jdbc.update("insert into operationsflow.app_user(id,email,display_name,password_hash,role,must_change_password) select ?,?,'Synthetic operator',password_hash,?,false from operationsflow.app_user where id=?",id,id+"@example.invalid",role.name(),TEST_ADMIN);return UsernamePasswordAuthenticationToken.authenticated(new SessionActor(id,role,0),null,List.of(new SimpleGrantedAuthority("ROLE_"+role)));}
     @Test void backendRolesCsrfAndValidationProtectFulfillmentRoutes()throws Exception{

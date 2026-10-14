@@ -55,7 +55,7 @@ export function FulfillmentPage({ readOnly = false }: { readOnly?: boolean }) {
     return () => abort.abort();
   }, [tab, state, warehouse, page, search, revision]);
   async function open(id: string) {
-    if (inflight.current) return; inflight.current = true; setBusy(true); setDetailError(''); setConfirmDispatch(false);
+    if (inflight.current) return; inflight.current = true; setBusy(true); setDetailError(''); setConfirmDispatch(false); if (detail?.orderId !== id) setDetail(null);
     try { setDetail(await request<Order>(`fulfillment/orders/${id}`)); } catch (e) { setDetailError((e as Error).message); } finally { inflight.current = false; setBusy(false); }
   }
   async function mutate(path: string, method: string, body?: unknown) {

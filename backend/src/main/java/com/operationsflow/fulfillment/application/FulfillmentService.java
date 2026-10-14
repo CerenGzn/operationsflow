@@ -33,7 +33,7 @@ public class FulfillmentService {
         if(!task.state().pickingAllowed())throw conflict("Picking cannot change after packing.");
         version(task,request.version());store.pick(id,sku,request.quantity());
         var lines=store.task(id).lines();TaskState state=lines.stream().allMatch(l->l.quantity()==l.pickedQuantity())?TaskState.PICKED:lines.stream().anyMatch(l->l.pickedQuantity()>0)?TaskState.PICKING:TaskState.PENDING;
-        store.state(id,state);started(task.orderId());audit.record("PICK_CONFIRMED",id);return store.task(id);
+        store.state(id,state);started(task.orderId());audit.record("PICK_CONFIRMED",id,"sku="+sku+";picked="+line.pickedQuantity()+"->"+request.quantity());return store.task(id);
     }
     public TaskView pack(UUID id,@NotNull @Valid Pack request){
         var task=lock(id);var quantities=new HashMap<UUID,Long>();

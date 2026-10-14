@@ -32,6 +32,6 @@ All routes retain session, CSRF, password-change and revocation checks. ADMIN an
 - POST `/api/v1/fulfillment/orders/{orderId}/dispatch`: atomically dispatch every allocation.
 - GET `/api/v1/fulfillment/shipments`: paged shipment history, optional warehouseId/state filters.
 
-Invalid quantities return 400, missing records 404, stale versions and invalid transitions 409. Lock contention remains a retryable 503. Frontend conflicts require refreshing current state; it never silently resubmits a changed mutation. Audit events contain authenticated actor and target UUID, not credentials or raw request bodies.
+Invalid quantities return 400, missing records 404, stale versions and invalid transitions 409. Lock contention remains a retryable 503. Frontend conflicts require refreshing current state; it never silently resubmits a changed mutation. Audit events contain authenticated actor and target UUID; picking events also capture the SKU UUID and before/after confirmed quantities so corrections remain traceable. Credentials and raw request bodies are never captured.
 
 V6 adds task, task-line, package and shipment tables, quantity/uniqueness/foreign-key constraints, immutable snapshot guards and allowed order transitions. Existing migrations and ledger semantics remain unchanged. Package/shipment metadata correction, carrier integration, returns, partial shipments, warehouse assignments and dispatch scheduling are deferred. The existing single-process authentication limitations still apply. No deployment is included.
