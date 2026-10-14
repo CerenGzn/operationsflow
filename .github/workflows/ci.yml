@@ -36,15 +36,9 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - name: Inspect candidate compatibility
+      - name: Generate reviewed security candidate
         run: |
-          npm view vite@7.3.7 engines peerDependencies --json
-          npm view vitest@3.2.7 engines dependencies peerDependencies --json
-          npm view vitest@4.1.11 engines dependencies peerDependencies --json
-          npm view tinypool@2.1.2 engines --json
-      - name: Generate minimal same-major candidate lockfile
-        run: |
-          npm install --save-dev --save-exact --package-lock-only --ignore-scripts vite@7.3.7 vitest@3.2.7
+          npm install --save-dev --save-exact --package-lock-only --ignore-scripts vite@7.3.7 vitest@4.1.11
           node -e 'const fs = require("node:fs"); for (const f of ["package.json", "package-lock.json"]) console.log("GENERATED_FILE " + JSON.stringify({path: f, content: fs.readFileSync(f, "utf8")}))'
       - run: npm ci
       - name: Full dependency security report
