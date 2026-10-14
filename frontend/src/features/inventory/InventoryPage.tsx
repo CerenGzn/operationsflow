@@ -18,7 +18,7 @@ export function InventoryPage() {
   const [state, setState] = useState('');
   const [page, setPage] = useState(0);
   const [revision, setRevision] = useState(0);
-  const [data, setData] = useState<Page<Balance | Movement | Reservation> | null>(null);
+  const [data, setData] = useState<(Page<Balance | Movement | Reservation> & { source: Tab }) | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -61,7 +61,7 @@ export function InventoryPage() {
     if (tab === 'reservations') { if (state) params.set('state', state); }
     else { if (warehouseId) params.set('warehouseId', warehouseId); if (skuId) params.set('skuId', skuId); }
     request<Page<Balance | Movement | Reservation>>(`inventory/${tab}?${params}`, { signal: controller.signal })
-      .then(result => { if (!Array.isArray(result.content)) throw new Error('Unexpected inventory response.'); if (!controller.signal.aborted) setData(result); })
+      .then(result => { if (!Array.isArray(result.content)) throw new Error('Unexpected inventory response.'); if (!controller.signal.aborted) setData({ ...result, source: tab }); })
       .catch(err => { if (!controller.signal.aborted) setError(err.message); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
@@ -101,9 +101,11 @@ export function InventoryPage() {
     } catch (err) { setMutationError((err as Error).message); }
     finally { inflight.current = false; setBusy(false); }
   }
-  function changeTab(next: Tab) { setTab(next); setPage(0); }
+  function changeTab(next: Tab) { setData(null); setLoading(true); setError(''); setTab(next); setPage(0); }
   const skuLabel = (id: string) => skus.find(s => s.id === id)?.code ?? id;
   const warehouseLabel = (id: string) => warehouses.find(w => w.id === id)?.code ?? id;
+
+  const currentData = data?.source === tab ? data : null;
 
   return <section aria-labelledby="inventory-title">
     <div className="page-header"><div><p className="eyebrow">Workspace / Inventory</p><h1 id="inventory-title">Inventory</h1><p className="muted">Accurate stock, explicit reservations, and a traceable movement history.</p></div><button disabled={busy} onClick={() => setRevision(r => r + 1)}>Refresh inventory</button></div>
@@ -113,17 +115,17 @@ export function InventoryPage() {
         <div className="inventory-tabs" role="group" aria-label="Inventory views">{(['balances', 'movements', 'reservations'] as Tab[]).map(t => <button key={t} aria-pressed={tab === t} className={tab === t ? 'primary' : ''} onClick={() => changeTab(t)}>{t.charAt(0).toUpperCase() + t.slice(1)}</button>)}</div>
         <div className="toolbar">
           {tab === 'reservations' ? <label>Reservation state<select value={state} onChange={e => { setState(e.target.value); setPage(0); }}><option value="">All states</option><option>ACTIVE</option><option>RELEASED</option><option>CONSUMED</option></select></label> : <span className="muted">Balances and movements follow the warehouse/SKU selectors. Available = on-hand − reserved.</span>}
-          {data && <span className="count">{data.totalElements} records</span>}
+          {currentData && <span className="count">{currentData.totalElements} records</span>}
         </div>
         {error && <div role="alert" className="error">{error}<button onClick={() => setRevision(r => r + 1)}>Retry</button></div>}
-        {loading ? <div className="empty" aria-live="polite">Loading {tab}…</div> : data && <>
-          {data.content.length === 0 ? <div className="empty"><h3>No {tab} found</h3><p>{tab === 'balances' ? 'Select a SKU and warehouse to receive the first stock. Missing balances represent zero stock.' : 'Recorded operations will appear here.'}</p></div> :
+        {loading ? <div className="empty" aria-live="polite">Loading {tab}…</div> : currentData && <>
+          {currentData.content.length === 0 ? <div className="empty"><h3>No {tab} found</h3><p>{tab === 'balances' ? 'Select a SKU and warehouse to receive the first stock. Missing balances represent zero stock.' : 'Recorded operations will appear here.'}</p></div> :
           <div className="table-scroll"><table><caption className="sr-only">Inventory {tab}</caption>
-            {tab === 'balances' && <><thead><tr><th>SKU / product</th><th>Warehouse</th><th>On-hand</th><th>Reserved</th><th>Available</th></tr></thead><tbody>{(data.content as Balance[]).map(b => <tr key={`${b.warehouseId}-${b.skuId}`}><td><code>{b.skuCode}</code><small>{b.productName}</small></td><td>{b.warehouseCode}</td><td>{number(b.onHand)}</td><td>{number(b.reserved)}</td><td><strong className={b.available === 0 ? 'stock-zero' : 'stock-available'}>{number(b.available)}</strong></td></tr>)}</tbody></>}
-            {tab === 'movements' && <><thead><tr><th>Movement</th><th>Stock location</th><th>Δ on-hand / reserved</th><th>Reason / trace</th></tr></thead><tbody>{(data.content as Movement[]).map(m => <tr key={m.id}><td><strong>{m.type}</strong><small>{new Date(m.createdAt).toLocaleString()}</small></td><td><code>{m.skuCode}</code><small>{m.warehouseCode}</small></td><td>{m.onHandDelta > 0 ? '+' : ''}{number(m.onHandDelta)} / {m.reservedDelta > 0 ? '+' : ''}{number(m.reservedDelta)}<small>After: {number(m.onHandAfter)} / {number(m.reservedAfter)}</small></td><td>{m.reason}<details><summary>Audit details</summary><small>Actor: {m.actor}</small><small className="identifier">Operation: {m.operationId}</small><small className="identifier">Movement: {m.id}</small></details></td></tr>)}</tbody></>}
-            {tab === 'reservations' && <><thead><tr><th>Owner / reference</th><th>Reserved lines</th><th>State</th><th>Actions</th></tr></thead><tbody>{(data.content as Reservation[]).map(r => <tr key={r.id}><td><strong>{r.ownerReference}</strong><small className="identifier">{r.id}</small></td><td>{r.lines.map(l => <small key={`${l.warehouseId}-${l.skuId}`}>{skuLabel(l.skuId)} · {warehouseLabel(l.warehouseId)} · {number(l.quantity)} units</small>)}</td><td><span className={`badge ${r.state === 'ACTIVE' ? 'active' : 'inactive'}`}>{r.state}</span></td><td>{r.state === 'ACTIVE' && <div className="reservation-actions"><button disabled={busy || Boolean(pending)} onClick={() => { setTerminal({ reservation: r, action: 'release' }); setTerminalReason(''); setMutationError(''); }}>Release</button><button disabled={busy || Boolean(pending)} onClick={() => { setTerminal({ reservation: r, action: 'consume' }); setTerminalReason(''); setMutationError(''); }}>Consume</button></div>}</td></tr>)}</tbody></>}
+            {tab === 'balances' && <><thead><tr><th>SKU / product</th><th>Warehouse</th><th>On-hand</th><th>Reserved</th><th>Available</th></tr></thead><tbody>{(currentData.content as Balance[]).map(b => <tr key={`${b.warehouseId}-${b.skuId}`}><td><code>{b.skuCode}</code><small>{b.productName}</small></td><td>{b.warehouseCode}</td><td>{number(b.onHand)}</td><td>{number(b.reserved)}</td><td><strong className={b.available === 0 ? 'stock-zero' : 'stock-available'}>{number(b.available)}</strong></td></tr>)}</tbody></>}
+            {tab === 'movements' && <><thead><tr><th>Movement</th><th>Stock location</th><th>Δ on-hand / reserved</th><th>Reason / trace</th></tr></thead><tbody>{(currentData.content as Movement[]).map(m => <tr key={m.id}><td><strong>{m.type}</strong><small>{new Date(m.createdAt).toLocaleString()}</small></td><td><code>{m.skuCode}</code><small>{m.warehouseCode}</small></td><td>{m.onHandDelta > 0 ? '+' : ''}{number(m.onHandDelta)} / {m.reservedDelta > 0 ? '+' : ''}{number(m.reservedDelta)}<small>After: {number(m.onHandAfter)} / {number(m.reservedAfter)}</small></td><td>{m.reason}<details><summary>Audit details</summary><small>Actor: {m.actor}</small><small className="identifier">Operation: {m.operationId}</small><small className="identifier">Movement: {m.id}</small></details></td></tr>)}</tbody></>}
+            {tab === 'reservations' && <><thead><tr><th>Owner / reference</th><th>Reserved lines</th><th>State</th><th>Actions</th></tr></thead><tbody>{(currentData.content as Reservation[]).map(r => <tr key={r.id}><td><strong>{r.ownerReference}</strong><small className="identifier">{r.id}</small></td><td>{r.lines.map(l => <small key={`${l.warehouseId}-${l.skuId}`}>{skuLabel(l.skuId)} · {warehouseLabel(l.warehouseId)} · {number(l.quantity)} units</small>)}</td><td><span className={`badge ${r.state === 'ACTIVE' ? 'active' : 'inactive'}`}>{r.state}</span></td><td>{r.state === 'ACTIVE' && <div className="reservation-actions"><button disabled={busy || Boolean(pending)} onClick={() => { setTerminal({ reservation: r, action: 'release' }); setTerminalReason(''); setMutationError(''); }}>Release</button><button disabled={busy || Boolean(pending)} onClick={() => { setTerminal({ reservation: r, action: 'consume' }); setTerminalReason(''); setMutationError(''); }}>Consume</button></div>}</td></tr>)}</tbody></>}
           </table></div>}
-          <div className="pagination"><span>Page {data.totalPages === 0 ? 0 : page + 1} of {data.totalPages}</span><div><button disabled={page === 0} onClick={() => setPage(p => p - 1)}>Previous</button><button disabled={page + 1 >= data.totalPages} onClick={() => setPage(p => p + 1)}>Next</button></div></div>
+          <div className="pagination"><span>Page {currentData.totalPages === 0 ? 0 : page + 1} of {currentData.totalPages}</span><div><button disabled={page === 0} onClick={() => setPage(p => p - 1)}>Previous</button><button disabled={page + 1 >= currentData.totalPages} onClick={() => setPage(p => p + 1)}>Next</button></div></div>
         </>}
       </div>
       <aside className="panel editor inventory-editor" aria-label="Stock operation">
