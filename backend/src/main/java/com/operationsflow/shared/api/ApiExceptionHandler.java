@@ -16,10 +16,14 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     ProblemDetail business(BusinessException ex) {
         HttpStatus status = switch (ex.code()) {
             case "NOT_FOUND" -> HttpStatus.NOT_FOUND;
-            case "INVALID_QUERY" -> HttpStatus.BAD_REQUEST;
+            case "INVALID_QUERY", "INVALID_REQUEST" -> HttpStatus.BAD_REQUEST;
             default -> HttpStatus.CONFLICT;
         };
         return problem(status, ex.code(), ex.getMessage());
+    }
+    @ExceptionHandler({org.springframework.dao.PessimisticLockingFailureException.class, org.springframework.dao.QueryTimeoutException.class})
+    ProblemDetail contention(Exception ex) {
+        return problem(HttpStatus.SERVICE_UNAVAILABLE, "RETRYABLE_CONFLICT", "Stock is busy. Retry the same operation with the same idempotency key.");
     }
     @ExceptionHandler(DataIntegrityViolationException.class)
     ProblemDetail integrity(DataIntegrityViolationException ex) {

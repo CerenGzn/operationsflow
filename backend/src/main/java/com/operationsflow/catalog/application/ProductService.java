@@ -18,7 +18,10 @@ import com.operationsflow.shared.domain.*;
 public class ProductService {
     private final ProductRepository products;
     private final SkuRepository skus;
-    public ProductService(ProductRepository products, SkuRepository skus) { this.products = products; this.skus = skus; }
+    private final ProductDeactivationPolicy deactivationPolicy;
+    public ProductService(ProductRepository products, SkuRepository skus, ProductDeactivationPolicy deactivationPolicy) {
+        this.products = products; this.skus = skus; this.deactivationPolicy = deactivationPolicy;
+    }
     public Page<View> list(String query, RecordStatus status, int page, int size, String sort, String direction) {
         String term = ListQuery.search(query).toLowerCase(Locale.ROOT);
         var pageable = ListQuery.page(page, size, sort, direction, Set.of("name", "createdAt", "status"));
@@ -56,7 +59,12 @@ public class ProductService {
     }
     @Transactional
     public View deactivate(UUID id, Deactivate request) {
-        var product = find(id); product.deactivate(request.version()); products.flush(); return view(product);
+        var product = products.findLockedById(id).orElseThrow(() -> new BusinessException("NOT_FOUND", "Product not found."));
+        if (product.getStatus() == RecordStatus.ACTIVE) {
+            product.checkVersion(request.version());
+            deactivationPolicy.requireNoStock(skus.findByProductIdInOrderByCodeAsc(List.of(id)).stream().map(Sku::getId).toList());
+        }
+        product.deactivate(request.version()); products.flush(); return view(product);
     }
     private Product find(UUID id) {
         return products.findById(id).orElseThrow(() -> new BusinessException("NOT_FOUND", "Product not found."));

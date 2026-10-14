@@ -15,7 +15,10 @@ import com.operationsflow.shared.domain.*;
 @Transactional(readOnly = true)
 public class WarehouseService {
     private final WarehouseRepository warehouses;
-    public WarehouseService(WarehouseRepository warehouses) { this.warehouses = warehouses; }
+    private final InventoryDeactivationPolicy deactivationPolicy;
+    public WarehouseService(WarehouseRepository warehouses, InventoryDeactivationPolicy deactivationPolicy) {
+        this.warehouses = warehouses; this.deactivationPolicy = deactivationPolicy;
+    }
     public Page<View> list(String query, RecordStatus status, int page, int size, String sort, String direction) {
         String term = ListQuery.search(query).toLowerCase(Locale.ROOT);
         var pageable = ListQuery.page(page, size, sort, direction, Set.of("name", "code", "city", "createdAt", "status"));
@@ -41,7 +44,9 @@ public class WarehouseService {
     }
     @Transactional
     public View deactivate(UUID id, Deactivate r) {
-        var warehouse = find(id); warehouse.deactivate(r.version()); warehouses.flush(); return view(warehouse);
+        var warehouse = warehouses.findLockedById(id).orElseThrow(() -> new BusinessException("NOT_FOUND", "Warehouse not found."));
+        if (warehouse.getStatus() == RecordStatus.ACTIVE) deactivationPolicy.requireEmptyWarehouse(id);
+        warehouse.deactivate(r.version()); warehouses.flush(); return view(warehouse);
     }
     private Warehouse find(UUID id) {
         return warehouses.findById(id).orElseThrow(() -> new BusinessException("NOT_FOUND", "Warehouse not found."));

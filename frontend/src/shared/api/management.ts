@@ -6,7 +6,7 @@ export interface ManagedRecord {
 }
 export interface PageResult { content: ManagedRecord[]; page: number; size: number; totalElements: number; totalPages: number }
 export class ApiError extends Error {
-  constructor(message: string, public fields: Record<string, string> = {}) { super(message); }
+  constructor(message: string, public fields: Record<string, string> = {}, public status?: number) { super(message); }
 }
 export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   let response: Response;
@@ -19,7 +19,7 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
   if (!response.ok) {
     const fields: Record<string, string> = {};
     if (Array.isArray(body?.errors)) for (const error of body.errors) fields[error.field] = error.message;
-    throw new ApiError(body?.detail ?? `Request failed (${response.status}). Please retry.`, fields);
+    throw new ApiError(body?.detail ?? `Request failed (${response.status}). Please retry.`, fields, response.status);
   }
   if (!body) throw new ApiError('The API returned an unexpected response.');
   return body as T;

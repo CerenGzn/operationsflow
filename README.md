@@ -132,3 +132,19 @@ cannot be undone in this milestone. Versions protect against stale edits.
 See [Milestone 2 API and design notes](docs/milestone-2.md) for contracts,
 constraints, tests and known limitations. Authentication, inventory, orders and
 stock reservations remain outside this milestone. Continue to run locally only.
+
+
+## Milestone 3 — Inventory and reservations
+
+Open **Inventory** in the workspace for warehouse/SKU balances, receipt and
+adjustment forms, movement history and reservation management. Flyway V3 applies
+on startup. Create synthetic products and warehouses before receiving stock.
+Available stock is derived from on-hand minus reserved. Every stock change has
+an immutable ledger entry and reason. Product/warehouse deactivation is blocked
+while stock remains.
+
+See [inventory contracts and concurrency design](docs/milestone-3.md) for lock
+ordering, idempotency, ownership, exactly-once release semantics, and the future
+order integration boundary. Reservations are explicit allocations; no order
+management or automatic warehouse allocation is included. The consume action
+is an inventory-only fulfillment deduction. Authentication is still deferred.
