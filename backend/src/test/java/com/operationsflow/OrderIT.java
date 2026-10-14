@@ -33,7 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
-class OrderIT {
+class OrderIT extends AuthenticatedTestSupport {
     @Container @ServiceConnection static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:17.6-alpine");
     @Autowired OrderService orders;
     @Autowired CustomerService customers;
@@ -68,10 +68,11 @@ class OrderIT {
         assertThat(reserved(f)).isEqualTo(active);
     }
     private <T> List<T> concurrent(int count,IntFunction<T> action) throws Exception {
+        var caller = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         var ready = new CountDownLatch(count); var start = new CountDownLatch(1);
         try (var pool = Executors.newFixedThreadPool(count)) {
             var futures = new ArrayList<Future<T>>();
-            for (int i=0;i<count;i++) { final int index=i; futures.add(pool.submit(() -> { ready.countDown(); start.await(); return action.apply(index); })); }
+            for (int i=0;i<count;i++) { final int index=i; futures.add(pool.submit(() -> { org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(caller); try { ready.countDown(); start.await(); return action.apply(index); } finally { org.springframework.security.core.context.SecurityContextHolder.clearContext(); } })); }
             boolean allReady = ready.await(10,TimeUnit.SECONDS); start.countDown(); assertThat(allReady).isTrue();
             var result = new ArrayList<T>(); for (var future:futures) result.add(future.get(30,TimeUnit.SECONDS)); return result;
         }

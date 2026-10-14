@@ -1,3 +1,4 @@
+import { csrfHeaders, resetCsrf } from './csrf';
 export type Status = 'ACTIVE' | 'INACTIVE';
 export interface ManagedRecord {
   id: string; name: string; status: Status; version: number;
@@ -10,13 +11,22 @@ export class ApiError extends Error {
 }
 export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   let response: Response;
-  try { response = await fetch(`/api/v1/${path}`, options); }
+  try {
+    const unsafe = !['GET', 'HEAD', 'OPTIONS'].includes((options.method ?? 'GET').toUpperCase());
+    const headers = new Headers(options.headers);
+    if (unsafe) for (const [key, value] of Object.entries(await csrfHeaders())) headers.set(key, value);
+    response = await fetch(`/api/v1/${path}`, { ...options, headers, credentials: 'same-origin' });
+  }
   catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') throw error;
     throw new ApiError('Cannot reach the API. Check your connection and retry.');
   }
+  if (response.status === 204) return undefined as T;
   const body = await response.json().catch(() => null);
   if (!response.ok) {
+    if (response.status === 401 && !['auth/login', 'auth/session'].includes(path)) window.dispatchEvent(new Event('operationsflow:session-expired'));
+    if (body?.code === 'CSRF_INVALID') { resetCsrf(); window.dispatchEvent(new Event('operationsflow:check-session')); }
+    if (body?.code === 'PASSWORD_CHANGE_REQUIRED') window.dispatchEvent(new Event('operationsflow:check-session'));
     const fields: Record<string, string> = {};
     if (Array.isArray(body?.errors)) for (const error of body.errors) fields[error.field] = error.message;
     throw new ApiError(body?.detail ?? `Request failed (${response.status}). Please retry.`, fields, response.status);

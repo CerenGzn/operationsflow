@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
-class CatalogWarehouseIT {
+class CatalogWarehouseIT extends AuthenticatedTestSupport {
     @Container @ServiceConnection
     static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:17.6-alpine");
     @Autowired MockMvc mvc;

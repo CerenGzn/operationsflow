@@ -1,3 +1,4 @@
+vi.mock('../../shared/api/csrf', () => ({ csrfHeaders: async () => ({ 'X-CSRF-TOKEN': 'component-test-token' }), resetCsrf: vi.fn() }));
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OrdersPage } from './OrdersPage';
@@ -41,7 +42,7 @@ describe('orders', () => {
     await screen.findByText(/created. Stock reserved/);
     const write = mock.mock.calls.find(([, options]) => options?.method === 'POST');
     expect(write?.[0]).toBe('/api/v1/orders'); expect(JSON.parse(write?.[1].body)).toEqual({ customerId: 'c1', lines: [{ skuId: 's1', quantity: 2 }] });
-    expect(write?.[1].headers['Idempotency-Key']).toMatch(/^[0-9a-f-]{36}$/); expect(sessionStorage.length).toBe(0);
+    expect(new Headers(write?.[1].headers).get('Idempotency-Key')).toMatch(/^[0-9a-f-]{36}$/); expect(sessionStorage.length).toBe(0);
   });
   it('retains exactly the same key and payload across ambiguous failure and remount', async () => {
     let writes = 0;

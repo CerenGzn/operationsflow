@@ -16,10 +16,12 @@ import com.operationsflow.shared.domain.*;
 @Service
 @Transactional(readOnly = true)
 public class ProductService {
+    private final com.operationsflow.audit.application.AuditService audit;
     private final ProductRepository products;
     private final SkuRepository skus;
     private final ProductDeactivationPolicy deactivationPolicy;
-    public ProductService(ProductRepository products, SkuRepository skus, ProductDeactivationPolicy deactivationPolicy) {
+    public ProductService(ProductRepository products, SkuRepository skus, ProductDeactivationPolicy deactivationPolicy, com.operationsflow.audit.application.AuditService audit) {
+        this.audit = audit;
         this.products = products; this.skus = skus; this.deactivationPolicy = deactivationPolicy;
     }
     public Page<View> list(String query, RecordStatus status, int page, int size, String sort, String direction) {
@@ -43,24 +45,25 @@ public class ProductService {
     public View create(Create request) {
         var product = products.saveAndFlush(new Product(request.name(), request.description()));
         skus.saveAndFlush(new Sku(product.getId(), request.skuCode()));
-        return view(product);
+        audit.record("PRODUCT_CREATED",product.getId()); return view(product);
     }
     @Transactional
     public View update(UUID id, Update request) {
         var product = find(id); product.update(request.name(), request.description(), request.version());
-        products.flush(); return view(product);
+        products.flush(); audit.record("PRODUCT_UPDATED",id); return view(product);
     }
     @Transactional
     public View addSku(UUID id, AddSku request) {
         var product = find(id); product.checkVersion(request.version()); product.touch();
         products.flush(); // Optimistic update serializes this change against edits/deactivation.
-        skus.saveAndFlush(new Sku(id, request.code()));
+        skus.saveAndFlush(new Sku(id, request.code())); audit.record("SKU_ADDED",id);
         return view(product);
     }
     @Transactional
     public View deactivate(UUID id, Deactivate request) {
         var product = products.findLockedById(id).orElseThrow(() -> new BusinessException("NOT_FOUND", "Product not found."));
         if (product.getStatus() == RecordStatus.ACTIVE) {
+            audit.record("PRODUCT_DEACTIVATED",id);
             product.checkVersion(request.version());
             deactivationPolicy.requireNoStock(skus.findByProductIdInOrderByCodeAsc(List.of(id)).stream().map(Sku::getId).toList());
         }

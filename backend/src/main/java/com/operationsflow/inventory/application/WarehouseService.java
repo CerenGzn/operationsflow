@@ -14,9 +14,11 @@ import com.operationsflow.shared.domain.*;
 @Service
 @Transactional(readOnly = true)
 public class WarehouseService {
+    private final com.operationsflow.audit.application.AuditService audit;
     private final WarehouseRepository warehouses;
     private final InventoryDeactivationPolicy deactivationPolicy;
-    public WarehouseService(WarehouseRepository warehouses, InventoryDeactivationPolicy deactivationPolicy) {
+    public WarehouseService(WarehouseRepository warehouses, InventoryDeactivationPolicy deactivationPolicy, com.operationsflow.audit.application.AuditService audit) {
+        this.audit = audit;
         this.warehouses = warehouses; this.deactivationPolicy = deactivationPolicy;
     }
     public Page<View> list(String query, RecordStatus status, int page, int size, String sort, String direction) {
@@ -34,17 +36,18 @@ public class WarehouseService {
     public View get(UUID id) { return view(find(id)); }
     @Transactional
     public View create(Create r) {
-        return view(warehouses.saveAndFlush(new Warehouse(r.code(), r.name(), r.addressLine(), r.city(), r.postalCode(), r.countryCode())));
+        var saved = warehouses.saveAndFlush(new Warehouse(r.code(), r.name(), r.addressLine(), r.city(), r.postalCode(), r.countryCode())); audit.record("WAREHOUSE_CREATED",saved.getId()); return view(saved);
     }
     @Transactional
     public View update(UUID id, Update r) {
         var warehouse = find(id);
         warehouse.update(r.name(), r.addressLine(), r.city(), r.postalCode(), r.countryCode(), r.version());
-        warehouses.flush(); return view(warehouse);
+        warehouses.flush(); audit.record("WAREHOUSE_UPDATED",id); return view(warehouse);
     }
     @Transactional
     public View deactivate(UUID id, Deactivate r) {
         var warehouse = warehouses.findLockedById(id).orElseThrow(() -> new BusinessException("NOT_FOUND", "Warehouse not found."));
+        if (warehouse.getStatus() == RecordStatus.ACTIVE) audit.record("WAREHOUSE_DEACTIVATED",id);
         if (warehouse.getStatus() == RecordStatus.ACTIVE) deactivationPolicy.requireEmptyWarehouse(id);
         warehouse.deactivate(r.version()); warehouses.flush(); return view(warehouse);
     }

@@ -164,3 +164,7 @@ reservations retain their existing release/consume behavior. No order shipment,
 authentication or deployment is included.
 
 See [Milestone 4 design, API and verification](docs/milestone-4.md).
+
+## Authentication and access control (Milestone 5)
+
+Operations now require a server-side authenticated session. See [Milestone 5 security guide](docs/milestone-5.md) for the one-time administrator bootstrap, permission matrix, user/password workflows, CSRF API usage, audit attribution and local/production limitations. There are no default accounts or public signup. Existing unauthenticated curl examples require a session cookie and CSRF header for writes.

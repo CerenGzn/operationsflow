@@ -1,4 +1,12 @@
 server:
+  servlet:
+    session:
+      timeout: 30m
+      tracking-modes: cookie
+      cookie:
+        http-only: true
+        secure: ${SESSION_COOKIE_SECURE:false}
+        same-site: strict
   address: ${SERVER_ADDRESS:127.0.0.1}
 spring:
   application:

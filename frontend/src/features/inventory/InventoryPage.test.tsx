@@ -1,3 +1,4 @@
+vi.mock('../../shared/api/csrf', () => ({ csrfHeaders: async () => ({ 'X-CSRF-TOKEN': 'component-test-token' }), resetCsrf: vi.fn() }));
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { InventoryPage } from './InventoryPage';
@@ -58,7 +59,7 @@ describe('inventory workspace', () => {
     await screen.findByText('Stock operation recorded. Balances and history refreshed.');
     const posts = fetchMock.mock.calls.filter(([, opts]) => opts?.method === 'POST');
     expect(posts).toHaveLength(2);
-    expect(posts[0][1].headers['Idempotency-Key']).toBe(posts[1][1].headers['Idempotency-Key']);
+    expect(new Headers(posts[0][1].headers).get('Idempotency-Key')).toBe(new Headers(posts[1][1].headers).get('Idempotency-Key'));
     expect(posts[0][1].body).toBe(posts[1][1].body);
     expect(JSON.parse(posts[0][1].body)).toEqual({ warehouseId: 'w1', skuId: 's1', quantity: 3, reason: 'Synthetic delivery' });
   });
