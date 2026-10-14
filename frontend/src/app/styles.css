@@ -95,3 +95,7 @@ details { margin-top: 8px; font-size: .75rem; }summary { cursor: pointer; color:
 .order-details > button { margin-top: 20px; }
 @media (max-width: 1200px) { .order-editor { width: 100%; max-width: 620px; } }
 @media (max-width: 760px) { nav { flex-wrap: wrap; }nav button { width: auto; flex: 1 1 100px; } }
+
+.availability-preview { margin: 20px; padding: 14px; border: 1px solid #cbdce9; background: #f6fafd; border-radius: 7px; font-size: .8rem; }
+.availability-preview ul { list-style: none; padding: 0; }.availability-preview li { padding: 8px 0; border-top: 1px solid #e2eaf2; }
+.availability-preview li span { display: block; margin-top: 5px; color: #55677e; }.availability-preview .error { margin: 10px 0; }

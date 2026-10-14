@@ -10,6 +10,7 @@ const response = (body: unknown, status = 200) => ({ ok: status < 400, status, j
 function mockApi(mutation?: (url: string, options: RequestInit) => unknown) {
   const mock = vi.fn().mockImplementation(async (url: string, options?: RequestInit) => {
     if (options?.method === 'POST' && mutation) return mutation(url, options);
+    if (url.includes('/inventory/availability?')) return response({ skuId: 's1', totalAvailable: 8, balances: page([{ warehouseId: 'w1', warehouseCode: 'BER-01', onHand: 10, reserved: 2, available: 8 }]) });
     if (url.includes('/customers?')) return response(page([customer]));
     if (url.includes('/products?')) return response(page([product]));
     return response(url.includes('?') ? page([order]) : order);
@@ -69,6 +70,34 @@ describe('orders', () => {
     await screen.findByText(/Order cancelled. Reserved stock released/);
     expect(mock.mock.calls.find(([url]) => url.endsWith('/cancel'))?.[1].body).toBe('{"reason":"Synthetic cancellation"}');
     expect(screen.queryByRole('button', { name: 'Cancel order' })).not.toBeInTheDocument();
+  });
+  it('previews live SKU availability without reserving stock', async () => {
+    const mock = mockApi(); render(<OrdersPage />);
+    fireEvent.click(screen.getByRole('button', { name: '+ New order' }));
+    await screen.findByRole('option', { name: 'SYNTH-SKU — Synthetic item' });
+    fireEvent.change(screen.getByLabelText('SKU'), { target: { value: 's1' } });
+    expect(await screen.findByText('8 available units')).toBeInTheDocument();
+    expect(screen.getByText('8 available · 2 reserved · 10 on-hand')).toBeInTheDocument();
+    expect(screen.getByText(/adding a line does not reserve it/)).toBeInTheDocument();
+    expect(mock.mock.calls.some(([url]) => url.includes('inventory/availability?skuId=s1'))).toBe(true);
+    expect(mock.mock.calls.filter(([, o]) => o?.method === 'POST')).toHaveLength(0);
+  });
+  it('retries failed availability and displays a zero-stock result honestly', async () => {
+    let attempts = 0;
+    const mock = mockApi();
+    const original = mock.getMockImplementation()!;
+    mock.mockImplementation(async (url: string, options?: RequestInit) => {
+      if (!url.includes('/inventory/availability?')) return original(url, options);
+      if (++attempts === 1) throw new TypeError('offline');
+      return response({ skuId: 's1', totalAvailable: 0, balances: page() });
+    });
+    render(<OrdersPage />); fireEvent.click(screen.getByRole('button', { name: '+ New order' }));
+    await screen.findByRole('option', { name: 'SYNTH-SKU — Synthetic item' });
+    fireEvent.change(screen.getByLabelText('SKU'), { target: { value: 's1' } });
+    expect(await screen.findByRole('alert')).toHaveTextContent('Cannot reach the API');
+    fireEvent.click(screen.getByRole('button', { name: 'Retry availability' }));
+    expect(await screen.findByText('0 available units')).toBeInTheDocument();
+    expect(screen.getByText('No recorded stock at active warehouses.')).toBeInTheDocument();
   });
   it('sends search and status filters to the API', async () => {
     const mock = mockApi(); render(<OrdersPage />); await screen.findByText('OF-0000000001');

@@ -45,6 +45,7 @@ Generated OpenAPI is available at `/v3/api-docs` and `/swagger-ui.html`.
 | POST `/orders` | 201 and Location; required UUID `Idempotency-Key`; customerId and 1–50 distinct SKU lines |
 | GET `/orders` | Search order number/customer snapshot name/reference; customerId/status; page/size; sort/direction |
 | GET `/orders/{id}` | Immutable customer, shipping, product/SKU and allocation snapshots; current state |
+| GET `/inventory/availability?skuId=...` | Advisory total available stock and paginated balances at active warehouses |
 | POST `/orders/{id}/cancel` | Required reason, up to 500 characters; 200, atomically releases reservation |
 
 Paths above are relative to `/api/v1`. Quantities are whole units 1–1,000,000,000
@@ -57,7 +58,7 @@ snapshots cannot be edited through the API. Synthetic business data only.
 Customer pagination is zero-based, size 1–100; sorts: name, referenceNumber, city,
 createdAt, status. Orders use createdAt (default descending), orderNumber,
 customerName, status with UUID tie-breaks. Search is a literal case-insensitive
-substring, not a SQL wildcard expression. Frontend reference selectors show up
+substring, not a SQL wildcard expression. The order form previews live SKU availability with loading/error/retry states and warehouse pagination. This read uses a repeatable-read snapshot for consistent totals and rows, takes no stock write locks and reserves nothing; order submission rechecks under locks. Frontend reference selectors show up
 to 100 search matches and explain how to refine the search; order lists paginate.
 
 ## Allocation and transaction invariants
@@ -167,4 +168,4 @@ Java 21/Node 22/Docker procedure and was not accessed or tested.
 
 No authentication, real customer data, order payments, shipments, public hosting
 or deployment. Ledger actor remains `UNAUTHENTICATED`. Run in a trusted local
-workspace only. No secrets are added.
+workspace only. No secrets are added. CI npm installation reports four audit findings (one moderate, one high, two critical) in the existing unchanged lockfile. They are not triaged or remediated in this milestone; dependency maintenance remains a separate follow-up.

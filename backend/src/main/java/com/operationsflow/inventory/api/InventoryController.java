@@ -25,6 +25,10 @@ public class InventoryController {
         @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
         return queries.balances(warehouseId, skuId, page, size);
     }
+    @GetMapping("/availability") @Operation(summary = "Preview available stock for an active SKU", description = "Read-only consistent snapshot across active warehouses, with a total and paginated balances sorted by warehouse code. Missing balances mean zero. Advisory only: order creation rechecks stock under locks; this call reserves nothing.")
+    public AvailabilityView availability(@RequestParam UUID skuId, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
+        return queries.availability(skuId, page, size);
+    }
     @GetMapping("/movements") @Operation(summary = "List immutable stock history, newest first", description = "Every committed stock effect has one movement per SKU/warehouse, with before-to-after deltas, reason, operation ID and truthful unauthenticated actor marker.")
     public PageResponse<MovementView> movements(@RequestParam(required = false) UUID warehouseId, @RequestParam(required = false) UUID skuId,
         @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
@@ -41,7 +45,7 @@ public class InventoryController {
         var result = service.adjust(key, request);
         return ResponseEntity.created(URI.create("/api/v1/inventory/movements/" + result.id())).body(result);
     }
-    @PostMapping("/reservations") @Operation(summary = "Atomically reserve explicit warehouse/SKU lines", description = "1–50 distinct lines; unique opaque ownerReference (future order ID). All lines succeed or all roll back. Sorted by warehouse/SKU for locking. This endpoint does not allocate warehouses automatically.")
+    @PostMapping("/reservations") @Operation(summary = "Atomically reserve explicit warehouse/SKU lines", description = "1–50 distinct lines; unique opaque ownerReference for manual reservations; order: prefix is reserved. All lines succeed or all roll back. Sorted by warehouse/SKU for locking. This endpoint does not allocate warehouses automatically.")
     public ResponseEntity<ReservationView> reserve(@RequestHeader("Idempotency-Key") UUID key, @Valid @RequestBody Reserve request) {
         var result = service.reserve(key, request);
         return ResponseEntity.created(URI.create("/api/v1/inventory/reservations/" + result.id())).body(result);
@@ -52,8 +56,8 @@ public class InventoryController {
         return queries.reservations(state, page, size);
     }
     @GetMapping("/reservations/{id}") public ReservationView reservation(@PathVariable UUID id) { return queries.reservation(id); }
-    @PostMapping("/reservations/{id}/release") @Operation(summary = "Release stock exactly once", description = "ACTIVE -> RELEASED. Repeating RELEASED returns current reservation without another stock effect. CONSUMED returns 409. No separate idempotency key is needed.")
+    @PostMapping("/reservations/{id}/release") @Operation(summary = "Release stock exactly once", description = "ACTIVE -> RELEASED. Repeating RELEASED returns current reservation without another stock effect. CONSUMED returns 409. No separate idempotency key is needed. Order-owned reservations return 409 ORDER_MANAGED; cancel through Orders.")
     public ReservationView release(@PathVariable UUID id, @Valid @RequestBody Terminal request) { return service.release(id, request); }
-    @PostMapping("/reservations/{id}/consume") @Operation(summary = "Consume reserved stock exactly once", description = "Inventory fulfillment primitive only: ACTIVE -> CONSUMED deducts both on-hand and reserved. Repeating CONSUMED is a no-op; RELEASED returns 409. Future orders must invoke this in their transaction.")
+    @PostMapping("/reservations/{id}/consume") @Operation(summary = "Consume reserved stock exactly once", description = "Inventory fulfillment primitive only: ACTIVE -> CONSUMED deducts both on-hand and reserved. Repeating CONSUMED is a no-op; RELEASED returns 409. Order-owned reservations return 409 ORDER_MANAGED; order fulfillment is not implemented.")
     public ReservationView consume(@PathVariable UUID id, @Valid @RequestBody Terminal request) { return service.consume(id, request); }
 }

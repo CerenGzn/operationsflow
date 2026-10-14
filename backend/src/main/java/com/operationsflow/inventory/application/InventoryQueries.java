@@ -44,6 +44,20 @@ public class InventoryQueries {
                 rs.getLong("on_hand") - rs.getLong("reserved"), rs.getTimestamp("updated_at").toInstant()));
         return page(rows, total, page, size);
     }
+    /** Advisory snapshot only; order allocation rechecks stock under write locks. */
+    @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    public AvailabilityView availability(UUID skuId, int page, int size) {
+        var params = parameters(null, skuId, page, size);
+        var statuses = jdbc.query("select p.status from operationsflow.sku s join operationsflow.product p on p.id = s.product_id where s.id = :sku", params, (rs,n) -> rs.getString(1));
+        if (statuses.isEmpty()) throw new BusinessException("NOT_FOUND", "SKU not found.");
+        if (!statuses.getFirst().equals("ACTIVE")) throw new BusinessException("INACTIVE_RECORD", "Availability requires an active product/SKU.");
+        String from = " from operationsflow.inventory_balance b join operationsflow.warehouse w on w.id = b.warehouse_id join operationsflow.sku s on s.id = b.sku_id join operationsflow.product p on p.id = s.product_id where b.sku_id = :sku and w.status = 'ACTIVE'";
+        long total = jdbc.queryForObject("select count(*)" + from, params, Long.class);
+        long available = jdbc.queryForObject("select coalesce(sum(b.on_hand - b.reserved),0)" + from, params, Long.class);
+        var rows = jdbc.query("select b.*, w.code warehouse_code, s.code sku_code, p.name product_name" + from + " order by w.code,w.id limit :limit offset :offset", params,
+            (rs,n) -> new BalanceView(rs.getObject("warehouse_id",UUID.class),rs.getString("warehouse_code"),skuId,rs.getString("sku_code"),rs.getString("product_name"),rs.getLong("on_hand"),rs.getLong("reserved"),rs.getLong("on_hand")-rs.getLong("reserved"),rs.getTimestamp("updated_at").toInstant()));
+        return new AvailabilityView(skuId,available,page(rows,total,page,size));
+    }
     private static final String MOVEMENT_SELECT = """
         select m.*, w.code warehouse_code, s.code sku_code from operationsflow.inventory_movement m
         join operationsflow.warehouse w on w.id = m.warehouse_id join operationsflow.sku s on s.id = m.sku_id

@@ -133,12 +133,12 @@ class OrderIT {
         assertThatThrownBy(() -> orders.create(key,request(f,3))).isInstanceOf(BusinessException.class).hasMessageContaining("idempotency"); reconcile(f); reconcile(other);
     }
     @Test void concurrentCancellationReleasesExactlyOnceAndKeepsFirstReason() throws Exception {
-        var f = fixture(10); var result = create(f,6);
+        var f = fixture(5); var second = warehouse("B-"); receive(second,f.sku(),5); var result = create(f,6);
         var replies = concurrent(10,i -> orders.cancel(result.id(),new Cancel("Reason "+i)));
         assertThat(replies).allMatch(v -> v.status()==OrderStatus.CANCELLED && v.version()==1);
         assertThat(replies.stream().map(View::cancellationReason).distinct()).hasSize(1);
-        assertThat(releases(result.reservationId())).isEqualTo(1); assertThat(reserved(f)).isZero();
-        assertThat(inventoryQueries.balances(f.warehouse(),f.sku(),0,20).content().getFirst().onHand()).isEqualTo(10); reconcile(f);
+        assertThat(releases(result.reservationId())).isEqualTo(2); assertThat(reserved(f)).isZero();
+        assertThat(inventoryQueries.balances(f.warehouse(),f.sku(),0,20).content().getFirst().onHand()).isEqualTo(5); reconcile(f);
     }
     @Test void cancellationRacingNewOrderPreservesStockAndLedger() throws Exception {
         var f=fixture(5); var original=create(f,5);
@@ -201,6 +201,21 @@ class OrderIT {
         mvc.perform(get("/api/v1/orders/"+UUID.randomUUID())).andExpect(status().isNotFound());
         mvc.perform(post("/api/v1/orders/"+id+"/cancel").contentType("application/json").content("{\"reason\":\" \"}")).andExpect(status().isBadRequest());
         mvc.perform(post("/api/v1/orders/"+id+"/cancel").contentType("application/json").content("{\"reason\":\"Synthetic cancellation\"}")).andExpect(status().isOk()).andExpect(jsonPath("$.status").value("CANCELLED"));
+    }
+    @Test void availabilityPreviewExcludesInactiveWarehousesAndDoesNotChangeStock() throws Exception {
+        var f = fixture(10); var other = warehouse("B-"); receive(other,f.sku(),5); create(f,3);
+        jdbc.update("update operationsflow.warehouse set status = 'INACTIVE' where id = ?",other);
+        long count = jdbc.queryForObject("select count(*) from operationsflow.inventory_movement where sku_id = ?",Long.class,f.sku());
+        mvc.perform(get("/api/v1/inventory/availability").param("skuId",f.sku().toString()).param("size","1"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.totalAvailable").value(7))
+            .andExpect(jsonPath("$.balances.totalElements").value(1)).andExpect(jsonPath("$.balances.content[0].reserved").value(3));
+        mvc.perform(get("/api/v1/inventory/availability").param("skuId",UUID.randomUUID().toString())).andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/inventory/availability").param("skuId",f.sku().toString()).param("size","0")).andExpect(status().isBadRequest());
+        var empty=fixture(0);
+        mvc.perform(get("/api/v1/inventory/availability").param("skuId",empty.sku().toString())).andExpect(status().isOk()).andExpect(jsonPath("$.totalAvailable").value(0)).andExpect(jsonPath("$.balances.content").isEmpty());
+        products.deactivate(empty.product(),new ProductContracts.Deactivate(0L));
+        mvc.perform(get("/api/v1/inventory/availability").param("skuId",empty.sku().toString())).andExpect(status().isConflict());
+        assertThat(jdbc.queryForObject("select count(*) from operationsflow.inventory_movement where sku_id = ?",Long.class,f.sku())).isEqualTo(count); reconcile(f);
     }
     @Test void customerHttpValidationUniquenessVersionSearchAndDeactivation() throws Exception {
         var f=fixture(0); var c=customers.get(f.customer());

@@ -24,6 +24,7 @@ public final class InventoryContracts {
     public record Terminal(@NotBlank @Size(max = 500) String reason) { public Terminal { reason = trim(reason); } }
     public record BalanceView(UUID warehouseId, String warehouseCode, UUID skuId, String skuCode, String productName,
         long onHand, long reserved, long available, Instant updatedAt) {}
+    public record AvailabilityView(UUID skuId, long totalAvailable, com.operationsflow.shared.api.PageResponse<BalanceView> balances) {}
     public record MovementView(UUID id, UUID warehouseId, UUID skuId, String warehouseCode, String skuCode,
         String type, long onHandDelta, long reservedDelta, long onHandAfter, long reservedAfter,
         UUID reservationId, UUID operationId, String reason, String actor, Instant createdAt) {}

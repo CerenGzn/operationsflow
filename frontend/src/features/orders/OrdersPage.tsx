@@ -9,6 +9,7 @@ interface Order extends Omit<Summary, 'customerName'> {
   allocations: { skuId: string; warehouseId: string; warehouseCode: string; quantity: number }[];
   reservationId: string; cancellationReason: string | null;
 }
+interface Availability { skuId: string; totalAvailable: number; balances: Page<{ warehouseId: string; warehouseCode: string; onHand: number; reserved: number; available: number }> }
 interface Attempt { key: string; body: string }
 const storageKey = 'operationsflow.pending-order.v1';
 function savedAttempt(): Attempt | null {
@@ -39,6 +40,10 @@ export function OrdersPage() {
   const [truncated, setTruncated] = useState(false);
   const [customerId, setCustomerId] = useState('');
   const [skuId, setSkuId] = useState('');
+  const [availability, setAvailability] = useState<Availability | null>(null);
+  const [availabilityError, setAvailabilityError] = useState('');
+  const [availabilityPage, setAvailabilityPage] = useState(0);
+  const [availabilityRevision, setAvailabilityRevision] = useState(0);
   const [quantity, setQuantity] = useState('1');
   const [lines, setLines] = useState<{ skuId: string; skuCode: string; quantity: number }[]>([]);
   const [busy, setBusy] = useState(false);
@@ -70,12 +75,21 @@ export function OrdersPage() {
       .finally(() => { if (!abort.signal.aborted) setReferenceLoading(false); });
     return () => abort.abort();
   }, [creating, references, revision]);
+  useEffect(() => {
+    if (!creating || !skuId) return;
+    const abort = new AbortController(); setAvailability(null); setAvailabilityError('');
+    request<Availability>(`inventory/availability?${new URLSearchParams({ skuId, page: String(availabilityPage), size: '10' })}`, { signal: abort.signal })
+      .then(result => { if (!abort.signal.aborted) setAvailability(result); })
+      .catch(err => { if (!abort.signal.aborted) setAvailabilityError(err.message); });
+    return () => abort.abort();
+  }, [creating, skuId, availabilityPage, availabilityRevision]);
+  const stock = availability?.skuId === skuId ? availability : null;
   const skus = products.flatMap(p => (p.skus ?? []).map(s => ({ ...s, name: p.name })));
   function addLine(event: FormEvent) {
     event.preventDefault(); const sku = skus.find(s => s.id === skuId); const amount = Number(quantity);
     if (!sku || !Number.isSafeInteger(amount) || amount < 1 || amount > 1_000_000_000) return;
     if (lines.some(l => l.skuId === skuId)) { setMutationError('This SKU is already in the order. Remove its line to change the quantity.'); return; }
-    setLines([...lines, { skuId, skuCode: sku.code, quantity: amount }]); setSkuId(''); setQuantity('1'); setMutationError('');
+    setLines([...lines, { skuId, skuCode: sku.code, quantity: amount }]); setSkuId(''); setAvailabilityPage(0); setQuantity('1'); setMutationError('');
   }
   async function send(attempt: Attempt) {
     if (inflight.current) return;
@@ -128,7 +142,16 @@ export function OrdersPage() {
         <form onSubmit={e => { e.preventDefault(); setReferences({ customer: customerSearch, product: productSearch }); setCustomerId(''); setSkuId(''); }}><fieldset disabled={busy || Boolean(pending)}><label>Find customers<input value={customerSearch} maxLength={100} onChange={e => setCustomerSearch(e.target.value)} /></label><label>Find products<input value={productSearch} maxLength={100} onChange={e => setProductSearch(e.target.value)} /></label><button>Find references</button></fieldset></form>
         {referenceLoading && <p className="muted">Loading active customers and SKUs…</p>}{referenceError && <p role="alert" className="error">{referenceError}<button onClick={() => setRevision(r => r + 1)}>Reload references</button></p>}{truncated && <p className="muted">Showing the first 100 matches. Refine your search to find other records.</p>}
         {!referenceLoading && !referenceError && (!customers.length || !skus.length) && <p className="muted">No matching active customers or SKUs. Create them in their management screens or refine your search.</p>}
-        <form onSubmit={addLine}><fieldset disabled={busy || Boolean(pending) || referenceLoading || Boolean(referenceError)}><label>Customer<select required value={customerId} onChange={e => setCustomerId(e.target.value)}><option value="">Select customer</option>{customers.map(c => <option key={c.id} value={c.id}>{c.referenceNumber} — {c.name}</option>)}</select></label><label>SKU<select required value={skuId} onChange={e => setSkuId(e.target.value)}><option value="">Select SKU</option>{skus.map(s => <option key={s.id} value={s.id}>{s.code} — {s.name}</option>)}</select></label><label>Quantity<input type="number" required min="1" max="1000000000" step="1" value={quantity} onChange={e => setQuantity(e.target.value)} /></label><button disabled={lines.length >= 50}>Add line</button></fieldset></form>
+        <form onSubmit={addLine}><fieldset disabled={busy || Boolean(pending) || referenceLoading || Boolean(referenceError)}><label>Customer<select required value={customerId} onChange={e => setCustomerId(e.target.value)}><option value="">Select customer</option>{customers.map(c => <option key={c.id} value={c.id}>{c.referenceNumber} — {c.name}</option>)}</select></label><label>SKU<select required value={skuId} onChange={e => { setSkuId(e.target.value); setAvailabilityPage(0); }}><option value="">Select SKU</option>{skus.map(s => <option key={s.id} value={s.id}>{s.code} — {s.name}</option>)}</select></label><label>Quantity<input type="number" required min="1" max="1000000000" step="1" value={quantity} onChange={e => setQuantity(e.target.value)} /></label><button disabled={lines.length >= 50}>Add line</button></fieldset></form>
+        {skuId && <div className="availability-preview" aria-label="Stock availability"><h3>Stock availability</h3>
+          {availabilityError ? <p role="alert" className="error">{availabilityError}<button onClick={() => setAvailabilityRevision(r => r + 1)}>Retry availability</button></p> : stock ? <>
+            <p><strong>{stock.totalAvailable.toLocaleString()} available units</strong> across active warehouses</p>
+            {stock.balances.content.length ? <ul>{stock.balances.content.map(b => <li key={b.warehouseId}><strong>{b.warehouseCode}</strong><span>{b.available.toLocaleString()} available · {b.reserved.toLocaleString()} reserved · {b.onHand.toLocaleString()} on-hand</span></li>)}</ul> : <p>No recorded stock at active warehouses.</p>}
+            {stock.balances.totalPages > 1 && <div className="input-row"><button disabled={availabilityPage === 0} onClick={() => setAvailabilityPage(p => p - 1)}>Previous warehouses</button><button disabled={availabilityPage + 1 >= stock.balances.totalPages} onClick={() => setAvailabilityPage(p => p + 1)}>Next warehouses</button></div>}
+            <button onClick={() => setAvailabilityRevision(r => r + 1)}>Refresh availability</button>
+          </> : <p aria-live="polite">Loading availability…</p>}
+          <p className="muted">Preview only. Stock can change before submission; adding a line does not reserve it.</p>
+        </div>}
         <div className="order-lines">{lines.length ? <ul>{lines.map(l => <li key={l.skuId}><code>{l.skuCode}</code><span>{l.quantity.toLocaleString()} units</span><button disabled={busy || Boolean(pending)} aria-label={`Remove ${l.skuCode}`} onClick={() => setLines(lines.filter(line => line.skuId !== l.skuId))}>Remove</button></li>)}</ul> : <p className="muted">Add at least one SKU line.</p>}<p><strong>{lines.reduce((total, l) => total + l.quantity, 0).toLocaleString()} units</strong> · {lines.length} lines</p><p className="muted">Stock is checked on submission. Allocation prefers a single warehouse, then splits by warehouse code. An insufficient order reserves nothing.</p><button className="primary" disabled={busy || Boolean(pending) || !customerId || !lines.length || referenceLoading || Boolean(referenceError)} onClick={create}>{busy ? 'Reserving…' : 'Create & reserve order'}</button></div>
       </aside>}
       {detail && <aside className="panel editor order-editor" aria-label="Order details"><div className="panel-heading"><h2>{detail.orderNumber}</h2><button disabled={busy} onClick={() => setDetail(null)} aria-label="Close order details">×</button></div><div className="order-details"><span className={`badge ${detail.status === 'RESERVED' ? 'active' : 'inactive'}`}>{detail.status}</span><h3>Shipping snapshot</h3><p><strong>{detail.customer.name}</strong><br />{detail.customer.referenceNumber}<br />{detail.customer.addressLine}<br />{detail.customer.postalCode} {detail.customer.city}, {detail.customer.countryCode}</p><h3>Order lines</h3><ul>{detail.lines.map(l => <li key={l.skuId}><code>{l.skuCode}</code> · {l.productName} · {l.quantity.toLocaleString()} units</li>)}</ul><h3>Warehouse allocation</h3><ul>{detail.allocations.map(a => <li key={`${a.warehouseId}-${a.skuId}`}><strong>{a.warehouseCode}</strong> · {detail.lines.find(l => l.skuId === a.skuId)?.skuCode ?? a.skuId} · {a.quantity.toLocaleString()} units</li>)}</ul><p><strong>{detail.totalUnits.toLocaleString()} total units</strong></p><small className="identifier">Reservation: {detail.reservationId}</small>{detail.cancellationReason && <p>Cancellation reason: {detail.cancellationReason}</p>}{detail.status === 'RESERVED' && !confirmCancel && <button className="danger" disabled={busy} onClick={() => setConfirmCancel(true)}>Cancel order</button>}</div>
