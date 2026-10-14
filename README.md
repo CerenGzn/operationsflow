@@ -41,7 +41,7 @@ In a second terminal, from the repository root:
 
 ```sh
 cd frontend
-npm install
+npm ci
 npm run dev
 ```
 
@@ -71,7 +71,7 @@ cd backend
 ./mvnw test                 # MVC contract unit test; no Docker required
 ./mvnw verify               # Also packages JAR and runs PostgreSQL Testcontainers
 cd ../frontend
-npm install
+npm ci
 npm run typecheck
 npm test
 npm run build
@@ -85,12 +85,10 @@ skip. For an explicitly limited build without PostgreSQL integration tests, use
 static assets only and has no backend proxy; use `npm run dev` for the connected
 foundation UI.
 
-Dependency versions are pinned directly. A frontend lockfile could not be
-generated because this implementation environment blocked npm access. After a
-successful `npm install`, review and retain `frontend/package-lock.json`, then
-switch CI to `npm ci`. Until then, transitive frontend dependencies are not fully
-reproducible. See [verification results](docs/verification.md) before treating the
-foundation as validated.
+Frontend dependency installation is reproducible through the committed
+`frontend/package-lock.json`; use `npm ci` locally and in CI. The merged
+foundation was verified by GitHub Actions. Historical cloud restrictions are
+recorded in [foundation verification](docs/verification.md).
 
 ### macOS setup
 
@@ -117,3 +115,20 @@ remain unverified on macOS.
 
 See [architecture](docs/architecture.md) for package boundaries and dependency
 choices. No deployment or publishing workflow is included.
+
+
+## Milestone 2 — Products, SKUs and warehouses
+
+The workspace now has live product and warehouse management screens. Start the
+same PostgreSQL/backend/frontend processes above; Flyway applies V2 automatically.
+No business data is seeded. Use synthetic records for development.
+
+Products have a name, description, status and one or more immutable globally
+unique SKU codes. Warehouses have immutable unique codes and address metadata.
+Both screens support search, status filters, sorting, pagination, creation,
+editing, and explicit deactivation. Inactive records are read-only; deactivation
+cannot be undone in this milestone. Versions protect against stale edits.
+
+See [Milestone 2 API and design notes](docs/milestone-2.md) for contracts,
+constraints, tests and known limitations. Authentication, inventory, orders and
+stock reservations remain outside this milestone. Continue to run locally only.
