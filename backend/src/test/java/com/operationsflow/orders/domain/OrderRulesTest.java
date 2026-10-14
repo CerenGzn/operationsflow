@@ -2,7 +2,8 @@ package com.operationsflow.orders.domain;
 
 import java.util.*;
 import org.junit.jupiter.api.Test;
-import com.operationsflow.inventory.domain.*;
+import com.operationsflow.inventory.domain.OrderAllocator;
+import com.operationsflow.inventory.domain.StockLine;
 import com.operationsflow.inventory.domain.OrderAllocator.*;
 import com.operationsflow.shared.domain.BusinessException;
 import static org.assertj.core.api.Assertions.*;
