@@ -15,7 +15,7 @@ const warehouseFields: Field[] = [
   { key: 'countryCode', label: 'Country code', max: 2, required: true, pattern: '[A-Z]{2}', help: 'Two uppercase letters, for example DE.' },
 ];
 
-export function ManagementPage({ kind }: { kind: Kind }) {
+export function ManagementPage({ kind, readOnly = false }: { kind: Kind; readOnly?: boolean }) {
   const isProduct = kind === 'products';
   const isCustomer = kind === 'customers';
   const singular = isProduct ? 'product' : isCustomer ? 'customer' : 'warehouse';
@@ -101,7 +101,7 @@ export function ManagementPage({ kind }: { kind: Kind }) {
     } catch (err) { showFormError(err); }
     finally { setBusy(false); }
   }
-  const inactive = editing && editing !== 'new' && editing.status === 'INACTIVE';
+  const inactive = readOnly || editing && editing !== 'new' && editing.status === 'INACTIVE';
   const identifier: Field = isProduct
     ? { key: 'skuCode', label: 'Initial SKU code', max: 64, required: true, pattern: '[A-Z0-9][A-Z0-9_-]{0,63}', help: 'Unique and permanent. Uppercase letters, numbers, hyphens and underscores.' }
     : { key: isCustomer ? 'referenceNumber' : 'code', label: isCustomer ? 'Customer reference' : 'Warehouse code', max: 32, required: true, pattern: '[A-Z0-9][A-Z0-9_-]{0,31}', help: 'Unique and permanent. Uppercase letters, numbers, hyphens and underscores.' };
@@ -109,7 +109,7 @@ export function ManagementPage({ kind }: { kind: Kind }) {
   return <section aria-labelledby="page-title">
     <div className="page-header"><div><p className="eyebrow">Workspace / {title}</p><h1 id="page-title">{title}</h1>
       <p className="muted">{isProduct ? 'Maintain your catalog and permanent SKU identifiers.' : isCustomer ? 'Manage business customers and shipping addresses. Use synthetic business data only.' : 'Manage the locations behind your fulfillment operations.'}</p></div>
-      <button className="primary" disabled={busy} onClick={startNew}>+ New {singular}</button></div>
+      {!readOnly && <button className="primary" disabled={busy} onClick={startNew}>+ New {singular}</button>}</div>
     {notice && <p className="notice" aria-live="polite">{notice}</p>}
     <div className="management-grid">
       <div className="panel records-panel">
@@ -134,7 +134,7 @@ export function ManagementPage({ kind }: { kind: Kind }) {
       {editing && <aside className="panel editor" aria-label={`${singular} editor`}>
         <div className="panel-heading"><h2>{editing === 'new' ? `New ${singular}` : `${inactive ? 'View' : 'Edit'} ${singular}`}</h2><button aria-label="Close editor" disabled={busy} onClick={() => setEditing(null)}>×</button></div>
         {formError && <p className="error" role="alert">{formError}</p>}
-        {inactive && <p className="muted">This record is inactive and read-only.</p>}
+        {inactive && <p className="muted">{readOnly ? 'Your role has read-only access to these records.' : 'This record is inactive and read-only.'}</p>}
         {editing !== 'new' && <div className="identity"><span className="eyebrow">Permanent identifiers</span><div className="codes">{isProduct ? editing.skus?.map(s => <code key={s.id}>{s.code}</code>) : <code>{isCustomer ? editing.referenceNumber : editing.code}</code>}</div></div>}
         <form onSubmit={save}>
           <fieldset disabled={busy || Boolean(inactive)}>

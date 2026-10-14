@@ -30,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
-class InventoryIT {
+class InventoryIT extends AuthenticatedTestSupport {
     @Container @ServiceConnection
     static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:17.6-alpine");
     @Autowired InventoryService inventory;
@@ -63,12 +63,13 @@ class InventoryIT {
         assertThat(balance.reserved()).isEqualTo(active);
     }
     private <T> List<T> concurrent(int count, IntFunction<T> action) throws Exception {
+        var caller = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         var ready = new CountDownLatch(count); var start = new CountDownLatch(1);
         try (var pool = Executors.newFixedThreadPool(count)) {
             var futures = new ArrayList<Future<T>>();
             for (int i = 0; i < count; i++) {
                 final int index = i;
-                futures.add(pool.submit(() -> { ready.countDown(); start.await(); return action.apply(index); }));
+                futures.add(pool.submit(() -> { org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(caller); try { ready.countDown(); start.await(); return action.apply(index); } finally { org.springframework.security.core.context.SecurityContextHolder.clearContext(); } }));
             }
             boolean allReady = ready.await(10, TimeUnit.SECONDS); start.countDown(); assertThat(allReady).isTrue();
             var results = new ArrayList<T>();
@@ -217,7 +218,7 @@ class InventoryIT {
         var history = queries.movements(f.warehouse(), f.sku(), 0, 20);
         assertThat(history.content()).extracting(MovementView::type).containsExactly("FULFILLMENT", "RESERVATION", "RECEIPT");
         assertThat(history.content().getFirst().reason()).isEqualTo("Synthetic shipment");
-        assertThat(history.content()).allMatch(m -> m.actor().equals("UNAUTHENTICATED")); reconcile(f);
+        assertThat(history.content()).allMatch(m -> m.actor().equals("user:"+TEST_ADMIN)); reconcile(f);
     }
     @Test void httpContractsValidateKeysBodiesFiltersAndUnknownReferences() throws Exception {
         var f = fixture(); String payload = json.writeValueAsString(receipt(f, 3)); var key = UUID.randomUUID().toString();

@@ -11,7 +11,7 @@ interface Pending { path: string; key: string; body: string }
 const labels: Record<Operation, string> = { receipts: 'Receive stock', adjustments: 'Adjust stock', reservations: 'Reserve stock' };
 const number = (value: number) => value.toLocaleString();
 
-export function InventoryPage() {
+export function InventoryPage({ readOnly = false }: { readOnly?: boolean }) {
   const [tab, setTab] = useState<Tab>('balances');
   const [warehouseId, setWarehouseId] = useState('');
   const [skuId, setSkuId] = useState('');
@@ -112,7 +112,7 @@ export function InventoryPage() {
     {notice && <p className="notice" aria-live="polite">{notice}</p>}
     <div className="inventory-layout">
       <div className="panel records-panel">
-        <div className="inventory-tabs" role="group" aria-label="Inventory views">{(['balances', 'movements', 'reservations'] as Tab[]).map(t => <button key={t} aria-pressed={tab === t} className={tab === t ? 'primary' : ''} onClick={() => changeTab(t)}>{t.charAt(0).toUpperCase() + t.slice(1)}</button>)}</div>
+        <div className="inventory-tabs" role="group" aria-label="Inventory views">{((readOnly ? ['balances'] : ['balances', 'movements', 'reservations']) as Tab[]).map(t => <button key={t} aria-pressed={tab === t} className={tab === t ? 'primary' : ''} onClick={() => changeTab(t)}>{t.charAt(0).toUpperCase() + t.slice(1)}</button>)}</div>
         <div className="toolbar">
           {tab === 'reservations' ? <label>Reservation state<select value={state} onChange={e => { setState(e.target.value); setPage(0); }}><option value="">All states</option><option>ACTIVE</option><option>RELEASED</option><option>CONSUMED</option></select></label> : <span className="muted">Balances and movements follow the warehouse/SKU selectors. Available = on-hand − reserved.</span>}
           {currentData && <span className="count">{currentData.totalElements} records</span>}
@@ -129,7 +129,7 @@ export function InventoryPage() {
         </>}
       </div>
       <aside className="panel editor inventory-editor" aria-label="Stock operation">
-        <div className="panel-heading"><h2>Stock operations</h2></div>
+        <div className="panel-heading"><h2>{readOnly ? 'Stock filters' : 'Stock operations'}</h2></div>
         <form onSubmit={e => { e.preventDefault(); setReferenceQuery({ products: productSearch, warehouses: warehouseSearch }); setWarehouseId(''); setSkuId(''); setPage(0); }}>
           <label>Find products<input disabled={busy || Boolean(pending)} value={productSearch} maxLength={100} placeholder="Product name or SKU code" onChange={e => setProductSearch(e.target.value)} /></label><label>Find warehouses<input disabled={busy || Boolean(pending)} value={warehouseSearch} maxLength={100} placeholder="Name, code or city" onChange={e => setWarehouseSearch(e.target.value)} /></label><button disabled={busy || Boolean(pending)} type="submit">Find references</button>
           {referenceTotal > 100 && <small>Showing the first 100 matches. Refine the search to find another record.</small>}
@@ -140,12 +140,12 @@ export function InventoryPage() {
           <fieldset disabled={busy || Boolean(pending) || Boolean(terminal)}>
             <label>Warehouse<select value={warehouseId} onChange={e => { setWarehouseId(e.target.value); setPage(0); }}><option value="">All / select warehouse</option>{warehouses.map(w => <option key={w.id} value={w.id}>{w.code} — {w.name}{w.status === 'INACTIVE' ? ' (inactive)' : ''}</option>)}</select></label>
             <label>SKU<select value={skuId} onChange={e => { setSkuId(e.target.value); setPage(0); }}><option value="">All / select SKU</option>{skus.map(s => <option key={s.id} value={s.id}>{s.code} — {s.product}{s.status === 'INACTIVE' ? ' (inactive)' : ''}</option>)}</select></label>
-            <label>Operation<select value={operation} onChange={e => { setOperation(e.target.value as Operation); setQuantity(''); }}><option value="receipts">Receive stock</option><option value="adjustments">Adjust stock</option><option value="reservations">Reserve stock</option></select></label>
+            {!readOnly && <><label>Operation<select value={operation} onChange={e => { setOperation(e.target.value as Operation); setQuantity(''); }}><option value="receipts">Receive stock</option><option value="adjustments">Adjust stock</option><option value="reservations">Reserve stock</option></select></label>
             <label>{operation === 'adjustments' ? 'Signed quantity change' : 'Quantity'}<input type="number" required min={operation === 'adjustments' ? -1_000_000_000 : 1} max={1_000_000_000} step="1" value={quantity} onChange={e => setQuantity(e.target.value)} /></label>
             {operation === 'reservations' && <div className="owner-field"><label htmlFor="reservation-owner">Owner reference</label><input id="reservation-owner" aria-describedby="reservation-owner-help" required maxLength={100} pattern="[A-Za-z0-9][A-Za-z0-9._:-]{0,99}" value={owner} onChange={e => setOwner(e.target.value)} /><small id="reservation-owner-help">Unique opaque reference, for a manual reservation. The order: prefix is reserved. Never enter customer details.</small></div>}
             <label>Reason<textarea required maxLength={500} value={reason} onChange={e => setReason(e.target.value)} /></label>
             {!canWrite && <p className="muted">Choose an active warehouse and SKU to change stock.</p>}
-            <button className="primary" disabled={!canWrite || referencesLoading || Boolean(referenceError)}>{busy ? 'Recording…' : labels[operation]}</button>
+            <button className="primary" disabled={!canWrite || referencesLoading || Boolean(referenceError)}>{busy ? 'Recording…' : labels[operation]}</button></>}
           </fieldset>
         </form>
         {mutationError && <p role="alert" className="error">{mutationError}</p>}

@@ -14,9 +14,11 @@ import com.operationsflow.shared.domain.*;
 @Service
 @Transactional(readOnly = true)
 public class CustomerService {
+    private final com.operationsflow.audit.application.AuditService audit;
     private final CustomerRepository customers;
     private final CustomerDeactivationPolicy deactivationPolicy;
-    public CustomerService(CustomerRepository customers, CustomerDeactivationPolicy deactivationPolicy) {
+    public CustomerService(CustomerRepository customers, CustomerDeactivationPolicy deactivationPolicy, com.operationsflow.audit.application.AuditService audit) {
+        this.audit = audit;
         this.customers = customers; this.deactivationPolicy = deactivationPolicy;
     }
     public Page<View> list(String query, RecordStatus status, int page, int size, String sort, String direction) {
@@ -34,17 +36,18 @@ public class CustomerService {
     public View get(UUID id) { return view(find(id)); }
     @Transactional
     public View create(Create r) {
-        return view(customers.saveAndFlush(new Customer(r.referenceNumber(), r.name(), r.addressLine(), r.city(), r.postalCode(), r.countryCode())));
+        var saved = customers.saveAndFlush(new Customer(r.referenceNumber(), r.name(), r.addressLine(), r.city(), r.postalCode(), r.countryCode())); audit.record("CUSTOMER_CREATED",saved.getId()); return view(saved);
     }
     @Transactional
     public View update(UUID id, Update r) {
         var customer = find(id);
         customer.update(r.name(), r.addressLine(), r.city(), r.postalCode(), r.countryCode(), r.version());
-        customers.flush(); return view(customer);
+        customers.flush(); audit.record("CUSTOMER_UPDATED",id); return view(customer);
     }
     @Transactional
     public View deactivate(UUID id, Deactivate r) {
         var customer = customers.findLockedById(id).orElseThrow(() -> new BusinessException("NOT_FOUND", "Customer not found."));
+        if (customer.getStatus() == RecordStatus.ACTIVE) audit.record("CUSTOMER_DEACTIVATED",id);
         if (customer.getStatus() == RecordStatus.ACTIVE) deactivationPolicy.requireNoOpenOrders(id);
         customer.deactivate(r.version()); customers.flush(); return view(customer);
     }

@@ -1,3 +1,4 @@
+vi.mock('../../shared/api/csrf', () => ({ csrfHeaders: async () => ({ 'X-CSRF-TOKEN': 'component-test-token' }), resetCsrf: vi.fn() }));
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ManagementPage } from './ManagementPage';

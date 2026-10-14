@@ -1,27 +1,26 @@
 import { useEffect, useState } from 'react';
 import { getSystemInfo } from '../shared/api/system';
+import { request } from '../shared/api/management';
+import { resetCsrf } from '../shared/api/csrf';
+import { Login, ChangePassword, type SessionUser } from '../features/auth/AuthForms';
+import { UsersPage } from '../features/users/UsersPage';
 import { OrdersPage } from '../features/orders/OrdersPage';
 import { InventoryPage } from '../features/inventory/InventoryPage';
 import { ManagementPage } from '../features/management/ManagementPage';
 
+type Section = 'products' | 'warehouses' | 'inventory' | 'customers' | 'orders' | 'users';
 export function App() {
-  const [status, setStatus] = useState('Connecting to backend…');
-  const [section, setSection] = useState<'products' | 'warehouses' | 'inventory' | 'customers' | 'orders'>('products');
-  useEffect(() => {
-    const controller = new AbortController();
-    getSystemInfo(controller.signal)
-      .then(info => setStatus(`Connected to ${info.application} API ${info.apiVersion}`))
-      .catch(() => { if (!controller.signal.aborted) setStatus('Backend unavailable. Check that the backend is running.'); });
-    return () => controller.abort();
-  }, []);
-  return <div className="app-shell">
-    <aside className="sidebar"><a className="brand" href="#"><span className="brand-icon">OF</span>OperationsFlow</a><p className="nav-label">OPERATIONS</p>
-      <nav aria-label="Main navigation"><button className={section === 'products' ? 'selected' : ''} aria-current={section === 'products' ? 'page' : undefined} onClick={() => setSection('products')}>Products<span>Catalog & SKUs</span></button><button className={section === 'warehouses' ? 'selected' : ''} aria-current={section === 'warehouses' ? 'page' : undefined} onClick={() => setSection('warehouses')}>Warehouses<span>Locations & details</span></button><button className={section === 'inventory' ? 'selected' : ''} aria-current={section === 'inventory' ? 'page' : undefined} onClick={() => setSection('inventory')}>Inventory<span>Stock & reservations</span></button><button className={section === 'customers' ? 'selected' : ''} aria-current={section === 'customers' ? 'page' : undefined} onClick={() => setSection('customers')}>Customers<span>Business directory</span></button><button className={section === 'orders' ? 'selected' : ''} aria-current={section === 'orders' ? 'page' : undefined} onClick={() => setSection('orders')}>Orders<span>Allocation & cancellation</span></button></nav>
-      <div className="sidebar-note">Operations workspace<small>Inventory & order management</small></div>
-    </aside>
-    <div className="workspace"><header className="topbar"><span>Operations workspace</span><span className="environment">Local development</span></header>
-      <main>{section === 'orders' ? <OrdersPage /> : section === 'inventory' ? <InventoryPage /> : <ManagementPage key={section} kind={section} />}</main>
-      <footer role="status">{status}</footer>
-    </div>
-  </div>;
+  const [user, setUser] = useState<SessionUser | null>(null); const [checking, setChecking] = useState(true); const [sessionError, setSessionError] = useState(''); const [notice, setNotice] = useState(''); const [passwordScreen, setPasswordScreen] = useState(false); const [loggingOut, setLoggingOut] = useState(false);
+  const [status, setStatus] = useState('Connecting to backend…'); const [section, setSection] = useState<Section>('products');
+  function signedOut(message: string) { setUser(null); setNotice(message); setPasswordScreen(false); resetCsrf(); try { sessionStorage.removeItem('operationsflow.pending-order.v1'); } catch { /* Storage may be disabled; authentication is held only in server cookies. */ } }
+  async function check() { setSessionError(''); try { setUser(await request<SessionUser>('auth/session')); } catch (error) { if ((error as { status?: number }).status === 401) signedOut('Sign in to access your workspace.'); else setSessionError((error as Error).message); } finally { setChecking(false); } }
+  useEffect(() => { void check(); const expired = () => signedOut('Your session expired or was revoked. Sign in again.'); const refresh = () => void check(); window.addEventListener('operationsflow:session-expired', expired); window.addEventListener('operationsflow:check-session', refresh); return () => { window.removeEventListener('operationsflow:session-expired', expired); window.removeEventListener('operationsflow:check-session', refresh); }; }, []);
+  useEffect(() => { if (!user || user.mustChangePassword) return; const controller = new AbortController(); setStatus('Connecting to backend…'); getSystemInfo(controller.signal).then(info => setStatus(`Connected to ${info.application} API ${info.apiVersion}`)).catch(() => { if (!controller.signal.aborted) setStatus('Backend unavailable. Check that the backend is running.'); }); return () => controller.abort(); }, [user]);
+  async function logout() { if (loggingOut) return; setLoggingOut(true); setSessionError(''); try { await request<void>('auth/logout', { method: 'POST' }); signedOut('You have been signed out.'); } catch (error) { setSessionError((error as Error).message); } finally { setLoggingOut(false); } }
+  if (checking) return <main className="auth-shell"><p role="status">Checking your session…</p></main>;
+  if (!user) return <>{sessionError && <div className="error" role="alert">{sessionError}<button onClick={() => void check()}>Retry session</button></div>}<Login notice={notice} onLogin={value => { setUser(value); setSection('products'); setNotice(''); setSessionError(''); }} /></>;
+  const admin = user.role === 'ADMIN'; const sales = admin || user.role === 'SALES_OPERATOR'; const warehouse = admin || user.role === 'WAREHOUSE_OPERATOR';
+  const sections: Section[] = ['products', 'warehouses', 'inventory', ...(sales ? ['customers' as const] : []), 'orders', ...(admin ? ['users' as const] : [])];
+  const allowed = sections.includes(section);
+  return <div className="app-shell"><aside className="sidebar"><a className="brand" href="#"><span className="brand-icon">OF</span>OperationsFlow</a><p className="nav-label">OPERATIONS</p>{!user.mustChangePassword && <nav aria-label="Main navigation">{sections.map(item => <button key={item} className={section === item ? 'selected' : ''} aria-current={section === item ? 'page' : undefined} onClick={() => { setSection(item); setPasswordScreen(false); }}>{item.charAt(0).toUpperCase() + item.slice(1)}</button>)}</nav>}<div className="sidebar-note">{user.displayName}<small>{user.role.replaceAll('_', ' ')}</small></div></aside><div className="workspace"><header className="topbar"><span>Operations workspace</span><div className="session-actions"><button onClick={() => setPasswordScreen(true)}>Change password</button><button disabled={loggingOut} onClick={() => void logout()}>Sign out</button></div></header>{sessionError && <p className="error" role="alert">{sessionError}</p>}<main key={user.id}>{user.mustChangePassword || passwordScreen ? <ChangePassword required={user.mustChangePassword} onCancel={() => setPasswordScreen(false)} onChanged={() => signedOut('Password changed. Sign in with your new password.')} /> : !allowed ? <p role="alert">Your role cannot access this screen.</p> : section === 'users' ? <UsersPage /> : section === 'orders' ? <OrdersPage readOnly={!sales} /> : section === 'inventory' ? <InventoryPage readOnly={!warehouse} /> : <ManagementPage key={section} kind={section} readOnly={section === 'customers' ? !sales : !admin} />}</main>{!user.mustChangePassword && <footer role="status">{status}</footer>}</div></div>;
 }

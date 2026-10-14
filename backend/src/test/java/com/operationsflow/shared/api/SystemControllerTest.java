@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(SystemController.class)
+@org.springframework.security.test.context.support.WithMockUser(roles="ADMIN")
 class SystemControllerTest {
     @Autowired MockMvc mvc;
 

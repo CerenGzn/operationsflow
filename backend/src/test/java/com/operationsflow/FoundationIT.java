@@ -19,7 +19,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @Testcontainers
-class FoundationIT {
+class FoundationIT extends AuthenticatedTestSupport {
     @Container
     @ServiceConnection
     static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:17.6-alpine");
@@ -31,7 +31,7 @@ class FoundationIT {
     @Test
     void migratesEmptyPostgresAndSecondMigrationIsANoOp() {
         assertThat(jdbc.queryForObject("select count(*) from information_schema.schemata where schema_name = 'operationsflow'", Integer.class)).isEqualTo(1);
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("4");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("5");
         flyway.validate();
         assertThat(flyway.migrate().migrationsExecuted).isZero();
     }
@@ -49,6 +49,6 @@ class FoundationIT {
         mvc.perform(get("/v3/api-docs"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.paths['/api/v1/system'].get").exists());
-        mvc.perform(get("/actuator/env")).andExpect(status().isNotFound());
+        mvc.perform(get("/actuator/env")).andExpect(status().isForbidden());
     }
 }

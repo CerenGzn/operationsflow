@@ -15,7 +15,7 @@ import com.operationsflow.shared.api.PageResponse;
 
 @RestController
 @RequestMapping("/api/v1/inventory")
-@Tag(name = "Inventory", description = "Transactional stock ledger. Quantities are integer units. Receipt, adjustment and reservation creation require a UUID Idempotency-Key. Same key/payload replays the original response; changed payload returns 409. No authenticated actor exists yet.")
+@Tag(name = "Inventory", description = "Transactional stock ledger. Quantities are integer units. Receipt, adjustment and reservation creation require a UUID Idempotency-Key. Same key/payload replays the original response; changed payload returns 409. New movements identify the authenticated actor; historical UNAUTHENTICATED entries remain unchanged.")
 public class InventoryController {
     private final InventoryService service;
     private final InventoryQueries queries;
@@ -29,7 +29,7 @@ public class InventoryController {
     public AvailabilityView availability(@RequestParam UUID skuId, @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
         return queries.availability(skuId, page, size);
     }
-    @GetMapping("/movements") @Operation(summary = "List immutable stock history, newest first", description = "Every committed stock effect has one movement per SKU/warehouse, with before-to-after deltas, reason, operation ID and truthful unauthenticated actor marker.")
+    @GetMapping("/movements") @Operation(summary = "List immutable stock history, newest first", description = "Every committed stock effect has one movement per SKU/warehouse, with before-to-after deltas, reason, operation ID and authenticated user ID (or the legacy UNAUTHENTICATED marker).")
     public PageResponse<MovementView> movements(@RequestParam(required = false) UUID warehouseId, @RequestParam(required = false) UUID skuId,
         @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
         return queries.movements(warehouseId, skuId, page, size);

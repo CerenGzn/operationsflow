@@ -13,9 +13,11 @@ import com.operationsflow.shared.domain.BusinessException;
 /** Explicit SQL makes lock acquisition order and ledger writes reviewable. */
 @Repository
 public class InventoryStore {
+    private final com.operationsflow.audit.application.AuditService audit;
     private final JdbcTemplate jdbc;
     private final NamedParameterJdbcTemplate named;
-    public InventoryStore(JdbcTemplate jdbc, NamedParameterJdbcTemplate named) { this.jdbc = jdbc; this.named = named; }
+    public InventoryStore(JdbcTemplate jdbc, NamedParameterJdbcTemplate named, com.operationsflow.audit.application.AuditService audit) {
+        this.audit = audit; this.jdbc = jdbc; this.named = named; }
     public void limitLockWait() { jdbc.execute("set local lock_timeout = '3s'"); }
     public record Operation(String operation, String hash, String response) {}
     public Operation claim(UUID key, String operation, String hash) {
@@ -45,9 +47,10 @@ public class InventoryStore {
         jdbc.update("""
             insert into operationsflow.inventory_movement(id, warehouse_id, sku_id, type, on_hand_delta, reserved_delta,
                 on_hand_after, reserved_after, reservation_id, operation_id, reason, actor)
-            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'UNAUTHENTICATED')
+            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, movementId, line.warehouseId(), line.skuId(), type, after.onHand() - before.onHand(), after.reserved() - before.reserved(),
-            after.onHand(), after.reserved(), reservationId, operationId, reason);
+            after.onHand(), after.reserved(), reservationId, operationId, reason, com.operationsflow.security.application.CurrentActor.label());
+        audit.record("INVENTORY_"+type,movementId);
         return movementId;
     }
     public void insertReservation(UUID id, String ownerReference) {
@@ -85,6 +88,7 @@ public class InventoryStore {
     }
     public void transition(UUID id, ReservationState target) {
         jdbc.update("update operationsflow.stock_reservation set state = ?, updated_at = clock_timestamp() where id = ?", target.name(), id);
+        audit.record("RESERVATION_"+target.name(),id);
     }
     public boolean hasWarehouseStock(UUID warehouseId) {
         return Boolean.TRUE.equals(jdbc.queryForObject("select exists(select 1 from operationsflow.inventory_balance where warehouse_id = ? and (on_hand > 0 or reserved > 0))", Boolean.class, warehouseId));
