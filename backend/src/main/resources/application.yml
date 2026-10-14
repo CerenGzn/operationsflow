@@ -3,6 +3,9 @@ server:
 spring:
   application:
     name: operationsflow
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}

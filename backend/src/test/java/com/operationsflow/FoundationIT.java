@@ -31,7 +31,7 @@ class FoundationIT {
     @Test
     void migratesEmptyPostgresAndSecondMigrationIsANoOp() {
         assertThat(jdbc.queryForObject("select count(*) from information_schema.schemata where schema_name = 'operationsflow'", Integer.class)).isEqualTo(1);
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("1");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("2");
         flyway.validate();
         assertThat(flyway.migrate().migrationsExecuted).isZero();
     }
