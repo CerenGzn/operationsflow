@@ -27,7 +27,7 @@ public final class InventoryContracts {
     public record MovementView(UUID id, UUID warehouseId, UUID skuId, String warehouseCode, String skuCode,
         String type, long onHandDelta, long reservedDelta, long onHandAfter, long reservedAfter,
         UUID reservationId, UUID operationId, String reason, String actor, Instant createdAt) {}
-    public record ReservationView(UUID id, String ownerReference, ReservationState state, List<Line> lines,
+    public record ReservationView(UUID id, String ownerReference, UUID orderId, ReservationState state, List<Line> lines,
         Instant createdAt, Instant updatedAt) {}
     private static String trim(String value) { return value == null ? null : value.strip(); }
 }

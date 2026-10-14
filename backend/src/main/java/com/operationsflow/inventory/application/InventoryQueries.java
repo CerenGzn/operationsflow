@@ -60,7 +60,7 @@ public class InventoryQueries {
     }
     private List<ReservationView> reservationRows(String where, Map<String, ?> params) {
         var headers = jdbc.query("select * from operationsflow.stock_reservation " + where, params,
-            (rs, n) -> new ReservationView(rs.getObject("id", UUID.class), rs.getString("owner_reference"), ReservationState.valueOf(rs.getString("state")), List.of(),
+            (rs, n) -> new ReservationView(rs.getObject("id", UUID.class), rs.getString("owner_reference"), rs.getObject("order_id", UUID.class), ReservationState.valueOf(rs.getString("state")), List.of(),
                 rs.getTimestamp("created_at").toInstant(), rs.getTimestamp("updated_at").toInstant()));
         if (headers.isEmpty()) return headers;
         record Row(UUID reservation, Line line) {}
@@ -68,7 +68,7 @@ public class InventoryQueries {
             Map.of("ids", headers.stream().map(ReservationView::id).toList()),
             (rs, n) -> new Row(rs.getObject("reservation_id", UUID.class), new Line(rs.getObject("warehouse_id", UUID.class), rs.getObject("sku_id", UUID.class), rs.getLong("quantity"))))
             .stream().collect(Collectors.groupingBy(Row::reservation, Collectors.mapping(Row::line, Collectors.toList())));
-        return headers.stream().map(h -> new ReservationView(h.id(), h.ownerReference(), h.state(), grouped.getOrDefault(h.id(), List.of()), h.createdAt(), h.updatedAt())).toList();
+        return headers.stream().map(h -> new ReservationView(h.id(), h.ownerReference(), h.orderId(), h.state(), grouped.getOrDefault(h.id(), List.of()), h.createdAt(), h.updatedAt())).toList();
     }
     public ReservationView reservation(UUID id) {
         var rows = reservationRows("where id = :id", Map.of("id", id));

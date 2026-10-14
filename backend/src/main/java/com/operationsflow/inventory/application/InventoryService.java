@@ -42,6 +42,7 @@ public class InventoryService {
         });
     }
     public ReservationView reserve(UUID key, Reserve request) {
+        if (request.ownerReference().startsWith("order:")) throw new BusinessException("INVALID_REQUEST", "The order: owner namespace is reserved.");
         var lines = request.lines().stream().map(l -> new StockLine(l.warehouseId(), l.skuId(), l.quantity())).sorted(StockLine.LOCK_ORDER).toList();
         for (int i = 1; i < lines.size(); i++) {
             if (StockLine.LOCK_ORDER.compare(lines.get(i - 1), lines.get(i)) == 0) {
@@ -60,12 +61,17 @@ public class InventoryService {
             return queries.reservation(id);
         });
     }
-    public ReservationView release(UUID id, Terminal request) { return finish(id, request, ReservationState.RELEASED); }
-    /** Inventory-only fulfillment primitive; Milestone 4 will call inside the order transaction. */
-    public ReservationView consume(UUID id, Terminal request) { return finish(id, request, ReservationState.CONSUMED); }
-    private ReservationView finish(UUID id, Terminal request, ReservationState target) {
+    public ReservationView release(UUID id, Terminal request) { return finish(id, request, ReservationState.RELEASED, null); }
+    /** Manual-reservation fulfillment primitive. Order-owned reservations reject this endpoint. */
+    public ReservationView consume(UUID id, Terminal request) { return finish(id, request, ReservationState.CONSUMED, null); }
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public ReservationView releaseForOrder(UUID orderId, UUID reservationId, Terminal request) {
+        return finish(reservationId, request, ReservationState.RELEASED, Objects.requireNonNull(orderId));
+    }
+    private ReservationView finish(UUID id, Terminal request, ReservationState target, UUID orderId) {
         store.limitLockWait();
         var state = store.lockReservation(id);
+        if (!Objects.equals(orderId, store.reservationOrder(id))) throw new BusinessException("ORDER_MANAGED", "Order reservations must be changed through their owning order.");
         if (!state.transitionTo(target)) return queries.reservation(id);
         var lines = store.lines(id); guard(lines); UUID operation = UUID.randomUUID();
         for (var line : lines) {

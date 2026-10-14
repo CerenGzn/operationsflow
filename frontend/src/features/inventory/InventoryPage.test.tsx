@@ -106,3 +106,11 @@ describe('inventory workspace', () => {
     expect(screen.getByRole('button', { name: 'Receive stock' })).toBeDisabled();
   });
 });
+
+it('does not offer manual release or consumption for order-owned reservations', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockImplementation(async url => url.includes('/reservations') ? response(page([{ ...reservation, orderId: 'o1' }])) : defaults(url)));
+  render(<InventoryPage />); fireEvent.click(screen.getByRole('button', { name: 'Reservations' }));
+  expect(await screen.findByText('Managed through Orders')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Release' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Consume' })).not.toBeInTheDocument();
+});

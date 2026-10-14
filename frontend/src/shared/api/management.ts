@@ -2,7 +2,7 @@ export type Status = 'ACTIVE' | 'INACTIVE';
 export interface ManagedRecord {
   id: string; name: string; status: Status; version: number;
   description?: string; skus?: { id: string; code: string }[];
-  code?: string; addressLine?: string; city?: string; postalCode?: string; countryCode?: string;
+  code?: string; referenceNumber?: string; addressLine?: string; city?: string; postalCode?: string; countryCode?: string;
 }
 export interface PageResult { content: ManagedRecord[]; page: number; size: number; totalElements: number; totalPages: number }
 export class ApiError extends Error {
