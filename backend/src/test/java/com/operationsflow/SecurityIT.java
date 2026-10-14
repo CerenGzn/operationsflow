@@ -196,6 +196,29 @@ class SecurityIT {
         assertThat(t.session().getAttribute("SPRING_SECURITY_CONTEXT")).isNull();
     }
 
+    @Test void operatorsCanCompleteTheirWorkflowsWithTruthfulAuditAttribution()throws Exception{
+        var root=login(admin);use(root);
+        var product=products.create(new ProductContracts.Create("Synthetic role workflow","","ROLE-"+UUID.randomUUID().toString().toUpperCase(Locale.ROOT)));
+        var sku=product.skus().getFirst().id();UUID warehouse=UUID.randomUUID();
+        jdbc.update("insert into operationsflow.warehouse(id,code,name,address_line,city,postal_code,country_code,status,created_at,updated_at) values (?,?,'Synthetic','Example 1','Berlin','10115','DE','ACTIVE',now(),now())",warehouse,"R-"+warehouse.toString().substring(0,20).toUpperCase(Locale.ROOT));
+        SecurityContextHolder.clearContext();
+        var warehouseUser=account("WAREHOUSE_OPERATOR",false);var warehouseSession=login(warehouseUser);var t=token(warehouseSession);
+        var receipt=mvc.perform(post("/api/v1/inventory/receipts").session(warehouseSession).header(t.header(),t.value()).header("Idempotency-Key",UUID.randomUUID()).contentType("application/json").content(json.writeValueAsString(new InventoryContracts.Receipt(warehouse,sku,5,"Synthetic operator receipt")))).andExpect(status().isCreated()).andExpect(jsonPath("$.actor").value("user:"+warehouseUser.id())).andReturn();
+        var movementId=UUID.fromString(json.readTree(receipt.getResponse().getContentAsString()).get("id").asText());
+        assertThat(jdbc.queryForObject("select actor_id from operationsflow.audit_event where target_id=?",UUID.class,movementId)).isEqualTo(warehouseUser.id());
+        var seller=account("SALES_OPERATOR",false);var sales=login(seller);
+        var customer=mutate(sales,"POST","/api/v1/customers",Map.of("referenceNumber","C-"+UUID.randomUUID().toString().substring(0,20).toUpperCase(Locale.ROOT),"name","Synthetic business","addressLine","Example 1","city","Berlin","postalCode","10115","countryCode","DE"));
+        assertThat(customer.getResponse().getStatus()).isEqualTo(201);var customerId=json.readTree(customer.getResponse().getContentAsString()).get("id").asText();
+        t=token(sales);UUID key=UUID.randomUUID();String body=json.writeValueAsString(Map.of("customerId",customerId,"lines",List.of(Map.of("skuId",sku,"quantity",3))));
+        var created=mvc.perform(post("/api/v1/orders").session(sales).header(t.header(),t.value()).header("Idempotency-Key",key).contentType("application/json").content(body)).andExpect(status().isCreated()).andReturn();
+        UUID order=UUID.fromString(json.readTree(created.getResponse().getContentAsString()).get("id").asText());
+        mvc.perform(post("/api/v1/orders").session(sales).header(t.header(),t.value()).header("Idempotency-Key",key).contentType("application/json").content(body)).andExpect(status().isCreated());
+        for(int i=0;i<2;i++)assertThat(mutate(sales,"POST","/api/v1/orders/"+order+"/cancel",Map.of("reason","Synthetic cancellation")).getResponse().getStatus()).isEqualTo(200);
+        assertThat(jdbc.queryForList("select actor_id from operationsflow.audit_event where target_id=? order by action",UUID.class,order)).containsExactly(seller.id(),seller.id());
+        assertThat(jdbc.queryForList("select actor from operationsflow.inventory_movement where sku_id=? and type in ('RESERVATION','RELEASE')",String.class,sku)).containsExactly("user:"+seller.id(),"user:"+seller.id());
+        assertThat(jdbc.queryForObject("select reserved from operationsflow.inventory_balance where sku_id=?",Long.class,sku)).isZero();
+    }
+
     @Test void bootstrapCannotCreateAnotherAdministratorAfterInitialization()throws Exception{
         assertThatThrownBy(()->identities.bootstrap("bootstrap@example.invalid",PASSWORD)).isInstanceOf(IllegalStateException.class).hasMessageContaining("empty user table");
     }
