@@ -36,22 +36,14 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - name: Generate reviewed security candidate
-        run: |
-          npx --yes npm@11.6.2 install --save-dev --save-exact --package-lock-only --ignore-scripts vite@7.3.7 vitest@4.1.11
-          node -e 'const fs = require("node:fs"); for (const f of ["package.json", "package-lock.json"]) console.log("GENERATED_FILE " + JSON.stringify({path: f, content: fs.readFileSync(f, "utf8")}))'
       - run: npm ci
-      - name: Full dependency security report
-        continue-on-error: true
-        run: npm audit --json
-      - name: Production dependency security report
-        continue-on-error: true
-        run: npm audit --omit=dev --json
-      - name: Installed dependency chains
-        run: npm ls --all
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - name: Audit all frontend dependencies
+        run: npm audit --json
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --json
 
   compose:
     runs-on: ubuntu-latest

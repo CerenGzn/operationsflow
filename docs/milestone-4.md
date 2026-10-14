@@ -168,4 +168,4 @@ Java 21/Node 22/Docker procedure and was not accessed or tested.
 
 No authentication, real customer data, order payments, shipments, public hosting
 or deployment. Ledger actor remains `UNAUTHENTICATED`. Run in a trusted local
-workspace only. No secrets are added. CI npm installation reports four audit findings (one moderate, one high, two critical) in the existing unchanged lockfile. They are not triaged or remediated in this milestone; dependency maintenance remains a separate follow-up.
+workspace only. No secrets are added. The four initial npm audit findings were resolved in the focused [frontend dependency security review](frontend-dependency-security.md) with reviewed Vite/Vitest upgrades and an npm-generated lockfile. Full and production-only audit checks now run in CI.
