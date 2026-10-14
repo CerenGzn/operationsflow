@@ -40,6 +40,10 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - name: Audit all frontend dependencies
+        run: npm audit --json
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --json
 
   compose:
     runs-on: ubuntu-latest

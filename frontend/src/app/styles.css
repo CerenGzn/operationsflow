@@ -85,3 +85,17 @@ details { margin-top: 8px; font-size: .75rem; }summary { cursor: pointer; color:
 @media (max-width: 1280px) { .inventory-layout { flex-direction: column; }.inventory-layout > .records-panel { width: 100%; }.inventory-editor { width: 100%; max-width: 620px; } }
 
 .owner-field { margin-bottom: 18px; }.owner-field small { display: block; margin-top: 6px; font-size: .72rem; color: #65788e; }
+
+.pricing-note { border-left: 3px solid #9bb0c6; padding: 10px 16px; color: #55677e; background: #eaf0f6; font-size: .8rem; margin-bottom: 24px; }
+.order-editor { width: 390px; }
+.order-lines, .order-details { margin: 20px; font-size: .85rem; }
+.order-lines ul, .order-details ul { padding: 0; list-style: none; }
+.order-lines li { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 0; border-bottom: 1px solid #e7ecf2; }
+.order-details li { padding: 8px 0; border-bottom: 1px solid #e7ecf2; line-height: 1.6; }
+.order-details > button { margin-top: 20px; }
+@media (max-width: 1200px) { .order-editor { width: 100%; max-width: 620px; } }
+@media (max-width: 760px) { nav { flex-wrap: wrap; }nav button { width: auto; flex: 1 1 100px; } }
+
+.availability-preview { margin: 20px; padding: 14px; border: 1px solid #cbdce9; background: #f6fafd; border-radius: 7px; font-size: .8rem; }
+.availability-preview ul { list-style: none; padding: 0; }.availability-preview li { padding: 8px 0; border-top: 1px solid #e2eaf2; }
+.availability-preview li span { display: block; margin-top: 5px; color: #55677e; }.availability-preview .error { margin: 10px 0; }

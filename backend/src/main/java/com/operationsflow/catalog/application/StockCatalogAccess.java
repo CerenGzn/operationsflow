@@ -24,4 +24,11 @@ public class StockCatalogAccess {
             throw new BusinessException("INACTIVE_RECORD", "Inventory cannot change for an inactive product/SKU.");
         }
     }
+    public record Snapshot(UUID skuId, String skuCode, String productName) {}
+    @Transactional(propagation = Propagation.MANDATORY)
+    public List<Snapshot> lockOrderSkus(Collection<UUID> ids) {
+        lockActiveSkus(ids);
+        return jdbc.query("select s.id, s.code, p.name from operationsflow.sku s join operationsflow.product p on p.id = s.product_id where s.id in (:ids) order by s.code, s.id",
+            Map.of("ids", ids), (rs, n) -> new Snapshot(rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3)));
+    }
 }

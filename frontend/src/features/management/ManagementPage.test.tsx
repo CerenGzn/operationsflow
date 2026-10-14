@@ -102,3 +102,24 @@ describe('management screens', () => {
     expect(screen.queryByRole('button', { name: 'Save warehouse' })).not.toBeInTheDocument();
   });
 });
+
+describe('customer management', () => {
+  const customer = { ...warehouse, id: 'c1', name: 'Synthetic customer', referenceNumber: 'SYNTH-01', code: undefined };
+  it('creates a business customer with a permanent reference and shipping address', async () => {
+    const mock = vi.fn().mockImplementation(async (_url, options) => response(options?.method === 'POST' ? customer : page()));
+    vi.stubGlobal('fetch', mock); render(<ManagementPage kind="customers" />);
+    fireEvent.click(screen.getByRole('button', { name: '+ New customer' }));
+    for (const [label, value] of [['Customer reference', 'SYNTH-01'], ['Business name', 'Synthetic customer'], ['Street address', 'Example street 1'], ['City', 'Berlin'], ['Postal code', '10115'], ['Country code', 'DE']]) fireEvent.change(screen.getByLabelText(new RegExp(label)), { target: { value } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save customer' })); await screen.findByText('Customer saved.');
+    const call = mock.mock.calls.find(([, o]) => o?.method === 'POST'); expect(call?.[0]).toBe('/api/v1/customers');
+    expect(JSON.parse(call?.[1].body)).toMatchObject({ referenceNumber: 'SYNTH-01', name: 'Synthetic customer', addressLine: 'Example street 1' });
+  });
+  it('protects customer reference on edit and displays an open-order deactivation conflict', async () => {
+    const mock = vi.fn().mockImplementation(async (url, options) => options?.method === 'POST' ? response({ detail: 'Cancel open orders before deactivating this customer.' }, false) : response(url.includes('?') ? page([customer]) : customer));
+    vi.stubGlobal('fetch', mock); render(<ManagementPage kind="customers" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'View Synthetic customer' })); await screen.findByLabelText(/Business name/);
+    expect(screen.queryByLabelText(/Customer reference/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Deactivate customer' })); fireEvent.click(screen.getByRole('button', { name: 'Confirm deactivation' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Cancel open orders'); expect(screen.getByLabelText(/Business name/)).toHaveValue('Synthetic customer');
+  });
+});

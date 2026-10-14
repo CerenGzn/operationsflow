@@ -148,3 +148,19 @@ ordering, idempotency, ownership, exactly-once release semantics, and the future
 order integration boundary. Reservations are explicit allocations; no order
 management or automatic warehouse allocation is included. The consume action
 is an inventory-only fulfillment deduction. Authentication is still deferred.
+
+## Milestone 4 — Customers and orders
+
+Open **Customers** to maintain synthetic business accounts and shipping addresses,
+then **Orders** to create, inspect and cancel orders. Flyway V4 applies on startup;
+existing setup commands and the committed npm lockfile are unchanged. Orders
+reserve stock atomically, preferring a single warehouse before splitting by
+warehouse code. Cancellation releases all allocations exactly once.
+
+Orders are explicitly **UNPRICED**: the catalog has no price model, so this
+milestone calculates unit totals only and does not invent prices or currencies.
+Order-owned reservations must be cancelled through Orders; manual inventory
+reservations retain their existing release/consume behavior. No order shipment,
+authentication or deployment is included.
+
+See [Milestone 4 design, API and verification](docs/milestone-4.md).

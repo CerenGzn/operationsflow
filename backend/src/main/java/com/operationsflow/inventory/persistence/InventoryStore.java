@@ -53,6 +53,22 @@ public class InventoryStore {
     public void insertReservation(UUID id, String ownerReference) {
         jdbc.update("insert into operationsflow.stock_reservation(id, owner_reference, state) values (?, ?, 'ACTIVE')", id, ownerReference);
     }
+    public void insertOrderReservation(UUID id, UUID orderId) {
+        jdbc.update("insert into operationsflow.stock_reservation(id, owner_reference, state, order_id) values (?, ?, 'ACTIVE', ?)", id, "order:" + orderId, orderId);
+    }
+    public UUID reservationOrder(UUID id) {
+        return jdbc.queryForObject("select order_id from operationsflow.stock_reservation where id = ?", UUID.class, id);
+    }
+    public record WarehouseOption(UUID id, String code) {}
+    public List<WarehouseOption> lockActiveWarehouses() {
+        return jdbc.query("select id, code from operationsflow.warehouse where status = 'ACTIVE' order by id for update",
+            (rs, n) -> new WarehouseOption(rs.getObject(1, UUID.class), rs.getString(2)));
+    }
+    public List<StockLine> lockAvailable(Collection<UUID> skus, Collection<UUID> warehouses) {
+        if (warehouses.isEmpty()) return List.of();
+        return named.query("select warehouse_id, sku_id, on_hand - reserved available from operationsflow.inventory_balance where sku_id in (:skus) and warehouse_id in (:warehouses) order by warehouse_id, sku_id for update",
+            Map.of("skus", skus, "warehouses", warehouses), (rs, n) -> new StockLine(rs.getObject(1, UUID.class), rs.getObject(2, UUID.class), rs.getLong(3)));
+    }
     public void insertLine(UUID reservationId, StockLine line) {
         jdbc.update("insert into operationsflow.stock_reservation_line(reservation_id, warehouse_id, sku_id, quantity) values (?, ?, ?, ?)",
             reservationId, line.warehouseId(), line.skuId(), line.quantity());
