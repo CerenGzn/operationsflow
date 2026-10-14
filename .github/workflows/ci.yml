@@ -37,6 +37,14 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      - name: Full dependency security report
+        continue-on-error: true
+        run: npm audit --json
+      - name: Production dependency security report
+        continue-on-error: true
+        run: npm audit --omit=dev --json
+      - name: Installed dependency chains
+        run: npm ls --all
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
