@@ -15,6 +15,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     ProblemDetail business(BusinessException ex) {
         HttpStatus status = switch (ex.code()) {
+            case "EXPORT_TOO_LARGE" -> HttpStatus.UNPROCESSABLE_ENTITY;
             case "NOT_FOUND" -> HttpStatus.NOT_FOUND;
             case "INVALID_QUERY", "INVALID_REQUEST" -> HttpStatus.BAD_REQUEST;
             default -> HttpStatus.CONFLICT;
