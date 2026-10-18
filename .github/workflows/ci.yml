@@ -65,6 +65,12 @@ jobs:
         run: python3 scripts/container-smoke.py
 
   demo-image:
+    strategy:
+      fail-fast: false
+      matrix:
+        jit: [default, c1]
+    env:
+      STARTUP_JIT: ${{ matrix.jit }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: [backend, frontend, compose]
@@ -74,3 +80,10 @@ jobs:
         run: docker build -f Dockerfile.demo -t operationsflow-demo:ci .
       - name: Verify production bundle and constrained runtime
         run: python3 scripts/bundled-image-smoke.py
+      - name: Save sanitized startup measurements
+        uses: actions/upload-artifact@v4
+        with:
+          name: startup-${{ matrix.jit }}
+          path: .cache/startup-${{ matrix.jit }}.json
+          if-no-files-found: error
+          retention-days: 7
