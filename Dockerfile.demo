@@ -1,0 +1,30 @@
+FROM node:22-alpine AS frontend
+WORKDIR /frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+COPY frontend/index.html frontend/tsconfig.json frontend/vite.config.ts ./
+COPY frontend/src/ src/
+RUN npm run build
+
+FROM eclipse-temurin:21-jdk-alpine AS backend
+WORKDIR /backend
+RUN apk add --no-cache curl
+COPY backend/.mvn/ .mvn/
+COPY backend/mvnw backend/pom.xml ./
+RUN chmod +x mvnw
+COPY backend/src/ src/
+COPY --from=frontend /frontend/dist/ src/main/resources/static/
+# Runs unit tests. Mandatory CI verify runs PostgreSQL integration tests separately.
+RUN ./mvnw --batch-mode --no-transfer-progress package
+
+FROM eclipse-temurin:21-jre-alpine
+RUN addgroup -S app && adduser -S -G app -u 10001 app
+WORKDIR /app
+COPY --from=backend --chown=app:app /backend/target/operationsflow-0.1.0-SNAPSHOT.jar app.jar
+USER 10001
+ENV SPRING_PROFILES_ACTIVE=demo
+EXPOSE 10000
+# Render uses /actuator/health/demo, not Docker HEALTHCHECK. No process supervisor needed.
+# Favor startup over peak JIT throughput on the explicitly constrained demo only.
+# See docs/startup-performance.md for measured costs and the rollback procedure.
+ENTRYPOINT ["java", "-XX:TieredStopAtLevel=1", "-Xms64m", "-Xmx224m", "-Xss512k", "-XX:MaxMetaspaceSize=128m", "-XX:ReservedCodeCacheSize=32m", "-XX:MaxDirectMemorySize=16m", "-XX:+UseSerialGC", "-XX:ActiveProcessorCount=1", "-XX:+ExitOnOutOfMemoryError", "-jar", "/app/app.jar"]

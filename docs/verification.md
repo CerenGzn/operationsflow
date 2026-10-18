@@ -110,3 +110,31 @@ and execution context rather than rewriting historical results.
 See the [Docker verification record](full-stack-docker.md#verification) for the
 current local command outcomes and new CI container smoke job. The main-branch
 run above predates containerization and does not validate the new images.
+
+## Milestone 9 preparation checks (2026-10-18)
+
+Maven `verify` was attempted once and failed downloading the wrapper: curl could
+not connect to the configured proxy (exit 7). `npm ci --fetch-retries=0
+--fetch-timeout=30000` failed with proxy connect EPERM (exit 1); dependent frontend
+checks/audits were not run. `docker info` failed with socket operation not permitted,
+so image builds and startup could not run locally. No retries or bypasses were used.
+
+The new CI `demo-image` job builds actual bundled assets and runs a disposable
+512 MiB/0.1 CPU HTTP smoke test, after existing backend/frontend/Compose jobs.
+Java additions test the UI/API boundary, CSRF/readiness/cookies and demo configuration.
+No new tests are claimed passing until their CI result is inspected. This does not
+validate Render's edge, remote Neon TLS, Safari, real cloud startup or sustained load.
+See [the demo guide](free-demo-deployment.md#validation-and-troubleshooting).
+
+Local static checks passed: YAML parsing, both existing Compose configurations,
+Python script syntax, relative documentation links/anchors and `git diff --check`.
+The original local Dockerfiles, Compose files, dependency manifests and lockfile
+are unchanged. These checks do not establish Java compilation or runtime success.
+
+## Startup performance follow-up
+
+[Comparison runs and measurements](startup-performance.md) record a remeasured
+baseline, C1 candidate, phase offsets, startup memory, throttling and request-latency
+trade-offs. Both comparison workflows passed all existing checks. The normal CI
+smoke now verifies the real optimized image entrypoint and retains sanitized metrics;
+the optional baseline remains reproducible without changing business/security settings.

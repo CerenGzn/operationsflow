@@ -134,3 +134,17 @@ See [verification evidence](verification.md) for the checked run and remaining g
 Future work includes hosted-runtime validation, browser E2E coverage, retention
 policies, durable sessions if needed, and performance measurement before replacing
 coarse locks or OFFSET pagination. These capabilities are not claimed as implemented.
+
+## Prepared single-service demo (Milestone 9)
+
+`Dockerfile.demo` builds React assets into the Spring Boot JAR and runs one non-root
+Java process with bounded memory. No hosted resource or live URL exists. The `demo`
+profile uses a three-connection direct Neon pool with verified TLS, Secure cookies,
+a fixed HTTPS edge contract and ignored forwarding headers. The separate bundled UI
+security chain permits only UI GET/HEAD documents/assets; existing operational API
+roles, sessions, CSRF, transactions and audit rules are preserved. Local Compose
+remains unchanged. A DB-free platform readiness group avoids routine Neon wake-ups;
+the full database readiness endpoint remains available for deliberate checks.
+
+See [free demo preparation](free-demo-deployment.md) for conditional feasibility,
+public-access limitations, manual reviewer accounts and the deployment approval gate.

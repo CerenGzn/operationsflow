@@ -63,3 +63,21 @@ jobs:
         run: docker compose --env-file .env.example -f compose.full.yml build
       - name: Authenticated full-stack smoke test
         run: python3 scripts/container-smoke.py
+
+  demo-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [backend, frontend, compose]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build bundled image without publishing
+        run: docker build -f Dockerfile.demo -t operationsflow-demo:ci .
+      - name: Verify production bundle and constrained runtime
+        run: python3 scripts/bundled-image-smoke.py
+      - name: Save sanitized startup measurements
+        uses: actions/upload-artifact@v4
+        with:
+          name: startup-image
+          path: .cache/startup-image.json
+          if-no-files-found: error
+          retention-days: 7

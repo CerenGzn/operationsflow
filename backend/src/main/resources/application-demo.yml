@@ -1,0 +1,38 @@
+operationsflow:
+  ui:
+    enabled: true
+server:
+  address: 0.0.0.0
+  port: ${PORT:10000}
+  forward-headers-strategy: none
+  servlet:
+    session:
+      cookie:
+        secure: true
+  tomcat:
+    threads:
+      max: 20
+      min-spare: 2
+    max-connections: 100
+    accept-count: 20
+spring:
+  datasource:
+    url: jdbc:postgresql://${DEMO_DB_HOST}:5432/${DEMO_DB_NAME}?sslmode=verify-full&sslfactory=org.postgresql.ssl.DefaultJavaSSLFactory&connectTimeout=15&socketTimeout=60&tcpKeepAlive=true
+    hikari:
+      maximum-pool-size: 3
+      minimum-idle: 0
+      idle-timeout: 60000
+      max-lifetime: 300000
+      keepalive-time: 0
+      connection-timeout: 30000
+      validation-timeout: 5000
+      initialization-fail-timeout: 60000
+  flyway:
+    connect-retries: 3
+management:
+  endpoint:
+    health:
+      group:
+        # Platform probes must not wake Neon on every poll. Full readiness still includes db.
+        demo:
+          include: readinessState

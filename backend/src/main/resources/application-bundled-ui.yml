@@ -1,0 +1,4 @@
+# Also used by local CI image tests; does not enable the Render/Neon profile.
+operationsflow:
+  ui:
+    enabled: true
