@@ -1,6 +1,6 @@
 # OperationsFlow architecture
 
-Current implementation through Milestone 7, checked against source on 2026-10-18.
+Application implementation through Milestone 7, with Milestone 8 local containerization.
 This describes one Spring Boot application, one React application, and one
 PostgreSQL database. It does not introduce architecture changes or hosting.
 
@@ -112,7 +112,12 @@ published port. Java and Vite run as separate development processes. Vite proxie
 The backend defaults to loopback. Actuator exposes health only, with hidden
 component details; readiness includes PostgreSQL and liveness does not.
 
-There are no application Dockerfiles or deployment pipeline. Maven Wrapper pins
+Multi-stage backend/frontend Dockerfiles and `compose.full.yml` now provide a
+separate local full-stack workflow. nginx serves production React assets and
+proxies same-origin APIs; only its localhost port is published. The original
+`compose.yaml` workflow above remains unchanged. See the [Docker guide](full-stack-docker.md)
+for isolated volumes, bootstrap, runtime users, HTTP limits and validation.
+There is no public deployment pipeline. Maven Wrapper pins
 Maven 3.9.11; the backend uses Java 21 / Spring Boot 3.5.7 / springdoc 2.8.14.
 The manifests and frontend lockfile are authoritative for dependency versions.
 The original [foundation architecture](https://github.com/CerenGzn/operationsflow/blob/4a572c4115fd46fa2a0a2cc34e1313d26dca6a6c/docs/architecture.md)
