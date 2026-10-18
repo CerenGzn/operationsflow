@@ -1,5 +1,10 @@
 # Free demo deployment preparation (Milestone 9)
 
+> Current hosting status: the owner now reports a live Render Free / Neon Free demo.
+> See [live demo](live-demo.md) and [controlled deployments](controlled-deployments.md).
+> Preparation/no-deployment statements below describe the earlier milestone; this
+> documentation update does not deploy or change provider settings.
+
 **Prepared, not deployed.** No account, resource, production secret, billing setup,
 public URL or live demo was created. Do not apply `deploy/render-free.yaml` yet.
 Review this PR and its CI, then obtain separate deployment approval. Creating a
