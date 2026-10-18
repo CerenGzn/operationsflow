@@ -15,3 +15,7 @@ frontend/coverage/
 .DS_Store
 .idea/
 .vscode/
+
+# Python release-readiness test caches
+__pycache__/
+*.pyc
