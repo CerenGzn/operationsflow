@@ -104,3 +104,9 @@ blocked Maven/npm downloads, unavailable Docker, missing lockfile, and then-unru
 CI. Those statements are historical and are superseded for the checked commit by
 the evidence above. Detailed milestone guides also retain their original scope
 and execution context rather than rewriting historical results.
+
+## Milestone 8 containerization
+
+See the [Docker verification record](full-stack-docker.md#verification) for the
+current local command outcomes and new CI container smoke job. The main-branch
+run above predates containerization and does not validate the new images.

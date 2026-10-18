@@ -10,7 +10,7 @@ It demonstrates Java/Spring transaction design, PostgreSQL concurrency control,
 role-based security, and a React interface connected to real application APIs.
 
 The implementation is a **modular monolith** with one PostgreSQL database.
-Milestones 1–7 are implemented. There is no hosted demo or deployment workflow.
+Milestones 1–7 are implemented. Full-stack Docker supports local operation; there is no hosted demo or deployment workflow.
 All development and test business records must be synthetic.
 
 ## Key Features
@@ -51,7 +51,7 @@ business effect, not exactly-once network delivery.
 | Database | PostgreSQL 17, Flyway migrations V1–V7 |
 | API | REST, structured problem responses, OpenAPI / springdoc |
 | Testing | JUnit 5, Spring Boot Test, PostgreSQL Testcontainers, Vitest, Testing Library |
-| Tooling | Docker Compose for PostgreSQL, GitHub Actions, npm lockfile and security audits |
+| Tooling | Docker Compose for PostgreSQL or the full stack, GitHub Actions, npm lockfile and security audits |
 
 Exact dependencies live in [backend/pom.xml](backend/pom.xml) and
 [frontend/package.json](frontend/package.json). TanStack Query, Kafka, RabbitMQ,
@@ -74,6 +74,33 @@ transaction, without inter-service HTTP or a message broker.
 
 See [architecture and trade-offs](docs/architecture.md) for boundaries, locking,
 audit behavior, and the difference between current-state KPIs and dated activity.
+
+## Full-stack Docker quick start
+
+Install Docker with Compose v2; no host Java, Maven or Node is needed.
+From the repository root:
+
+```sh
+cp -n .env.example .env
+# Privately replace the database password placeholders in .env.
+docker compose -f compose.full.yml build
+docker compose -f compose.full.yml up -d --wait postgres
+```
+
+Complete the [one-time administrator setup](docs/full-stack-docker.md#first-administrator-empty-database-only)
+using hidden environment prompts, then start the complete stack:
+
+```sh
+docker compose -f compose.full.yml up -d --build --wait --wait-timeout 180
+```
+
+Open **http://localhost:8080**. Only the frontend is exposed, on localhost;
+backend and PostgreSQL remain on Docker networks. Stop with
+`docker compose -f compose.full.yml down` (data is retained). See the
+[Docker guide](docs/full-stack-docker.md) for health checks, troubleshooting,
+security limitations and explicit destructive cleanup. This local HTTP stack is
+not an internet deployment. The developer workflow below remains available and
+uses a separate database volume.
 
 ## Getting Started
 
@@ -178,6 +205,7 @@ and both npm audit checks; it does not deploy the application.
 
 | Guide | Contents |
 | --- | --- |
+| [Full-stack Docker](docs/full-stack-docker.md) | Build, bootstrap, run, health and cleanup |
 | [Architecture](docs/architecture.md) | Current modules, transaction boundaries, and trade-offs |
 | [Verification](docs/verification.md) | Current CI evidence, commands, and limitations |
 | [Milestone 2](docs/milestone-2.md) | Catalog/SKU/warehouse design and original scope |
@@ -194,8 +222,7 @@ is deferred” in earlier milestones describe that stage, not the current applic
 
 ## Roadmap / Future Enhancements
 
-Planned, **not implemented**: production container builds and hosted-demo
-validation; browser E2E tests; durable sessions and distributed throttling if
+Planned, **not implemented**: hosted-demo validation and image supply-chain hardening; browser E2E tests; durable sessions and distributed throttling if
 scaling is needed; measured query/locking optimization; and separately designed
 pricing, partial shipments, returns, and retention policies. Hosting feasibility
-has been discussed, but no deployment is included in this repository cleanup.
+has been discussed, but no deployment is included in this containerization milestone.
