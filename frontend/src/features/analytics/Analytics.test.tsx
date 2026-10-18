@@ -71,3 +71,21 @@ describe('operational reports', () => {
     vi.mocked(request).mockImplementation(async path => { if (path.startsWith('warehouses?')) return { content: [], totalElements: 0 }; throw new Error('Report unavailable'); }); render(<ReportsPage role="ADMIN" />); expect(await screen.findByRole('button', { name: 'Retry report' })).toBeInTheDocument();
   });
 });
+
+describe('demo viewer reports', () => {
+  it('allows only five datasets and no export control while retaining filters and pagination', async () => {
+    reportsSetup(); render(<ReportsPage role="DEMO_VIEWER" />); await screen.findByText('OF-101');
+    expect(within(screen.getByLabelText('Report dataset')).getAllByRole('option').map(o => (o as HTMLOptionElement).value))
+      .toEqual(['orders', 'inventory', 'low-stock', 'fulfillment', 'movements']);
+    expect(screen.queryByRole('button', { name: 'Export filtered CSV' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    await waitFor(() => expect(request).toHaveBeenLastCalledWith(expect.stringContaining('page=1'), expect.anything()));
+    expect(exportCsv).not.toHaveBeenCalled();
+  });
+  it('shows a backend permission error without offering a mutation or export fallback', async () => {
+    vi.mocked(request).mockImplementation(async path => { if (path.startsWith('warehouses?')) return { content: [], totalElements: 0 }; throw new Error('Your role does not permit this action.'); });
+    render(<ReportsPage role="DEMO_VIEWER" fixedKind="fulfillment" />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Your role does not permit');
+    expect(screen.queryByRole('button', { name: /Export/ })).not.toBeInTheDocument();
+  });
+});

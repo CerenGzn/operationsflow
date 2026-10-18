@@ -42,46 +42,29 @@ This is one demo instance, not a high-availability or production-certified servi
 
 ## Reviewer permissions
 
-Recommend **SALES_OPERATOR** for an order-focused technical review. It gives broad
-visibility without direct stock/fulfillment writes or user administration. It is
-**not read-only**. WAREHOUSE_OPERATOR is an alternative for a warehouse-focused
-review, not an additional permission to assign by default. Each user has one role.
+The new **DEMO_VIEWER** role is the recommended portfolio role **after a separately
+approved deployment of Milestone 11**. This change does not deploy it or create an
+account. Until then, the live application's role options may still be the original
+three; do not substitute an operator account when read-only access is required.
 
-| Capability | SALES_OPERATOR | WAREHOUSE_OPERATOR | ADMIN |
-| --- | --- | --- | --- |
-| Products and warehouses | Read | Read | Create/edit/deactivate |
-| Stock balances and availability | Read | Read | Read |
-| Inventory movements/reservations, receipts/adjustments/releases | No direct access or writes | Read and permitted writes | Read and permitted writes |
-| Orders | Read/create/cancel | Read | Read/create/cancel |
-| Customer management | Read/create/edit/deactivate | No | Yes |
-| Fulfillment and shipments | Read | Operational writes | Operational writes |
-| Dashboard | Yes; no movement trend | Yes | Yes |
-| Order/inventory/low-stock/fulfillment/shipment reports and exports | Yes | Yes | Yes |
-| Movement reports and exports | No | Yes | Yes |
-| Audit reports/events and user administration | No | No | Yes |
-| OpenAPI/Swagger | No | No | Yes |
+A viewer can read the dashboard, products/warehouses, stock balances/availability,
+and five field-limited reports: orders, inventory, low stock, movements and fulfillment.
+The Orders and Fulfillment navigation items use those reports, not sensitive detail
+APIs. Customer records/destinations, tracking references, raw ledger reasons/actors,
+reservations, audit, user administration, OpenAPI and all CSV exports are denied.
+No business mutations are permitted. Personal password change and logout remain
+available with CSRF; authentication and password changes still generate audit events.
 
-Sales order creation reserves stock; cancellation releases it. Both operator roles
-can therefore change shared synthetic data through their permitted workflows.
-Read access includes operational order snapshots; there is no per-reviewer tenant,
-warehouse assignment or isolated dataset. Dashboard recent activity is an operational
-summary, not access to the administrative audit log. Permission checks apply to
-direct API calls too, in `SecurityConfiguration` and `ReportingAccess`; hiding
-frontend controls is not the security boundary.
+See [exact permissions and owner account steps](demo-viewer.md). Use a unique synthetic
+email-format login alias and privately delivered temporary password for each person.
+The reviewer must change the password. Accounts do not expire automatically: the owner
+must deactivate them after the review. Revocation takes effect on the next request;
+an already executing read may finish. There is no per-reviewer dataset isolation.
 
-The owner should create a uniquely identifiable account in the existing Users UI,
-use a unique synthetic email-format login alias and synthetic display name (the
-form requires an email-shaped identifier), assign only the needed
-role, and deliver the temporary password through a private channel. No email address
-needs to be committed or published. Arrange an end time and manually deactivate the
-account afterward: automatic account expiry is not implemented. Deactivation/role
-changes invalidate existing sessions on their next request; an already executing
-request is not retroactively undone. Keep ADMIN for the owner.
-
-If any shared-data mutation is unacceptable, neither operator role is suitable.
-Use an owner-led walkthrough until a separate milestone adds a backend-enforced
-read-only role, scoped reports/exports and authorization tests. Do not substitute
-hidden buttons or a public shared administrator account.
+Existing roles are unchanged: SALES_OPERATOR can manage customers and create/cancel
+orders; WAREHOUSE_OPERATOR can change stock and fulfillment; ADMIN has user management.
+Neither operator is a read-only fallback. Keep ADMIN owner-only. Never publish shared
+credentials or allow anonymous operational access.
 
 ## Verification boundary
 

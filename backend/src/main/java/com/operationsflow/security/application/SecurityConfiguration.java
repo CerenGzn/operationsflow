@@ -35,6 +35,15 @@ public class SecurityConfiguration {
             .requestMatchers(HttpMethod.POST,"/api/v1/auth/login").permitAll()
             .requestMatchers("/api/v1/auth/session","/api/v1/auth/logout","/api/v1/auth/change-password").authenticated()
             .requestMatchers("/api/v1/users/**","/api/v1/audit-events/**","/v3/api-docs/**","/swagger-ui/**","/swagger-ui.html").hasRole("ADMIN")
+            // Explicit viewer allowlist: no raw orders, destinations, tracking, ledger actors or exports.
+            // Existing role matchers below retain their original privileges.
+            .requestMatchers(HttpMethod.GET,"/api/v1/system","/api/v1/products","/api/v1/products/{id}",
+                "/api/v1/warehouses","/api/v1/warehouses/{id}","/api/v1/inventory/balances","/api/v1/inventory/availability",
+                "/api/v1/analytics/dashboard","/api/v1/reports/orders","/api/v1/reports/inventory",
+                "/api/v1/reports/low-stock","/api/v1/reports/fulfillment")
+                .hasAnyRole("ADMIN","WAREHOUSE_OPERATOR","SALES_OPERATOR","DEMO_VIEWER")
+            .requestMatchers(HttpMethod.GET,"/api/v1/reports/movements")
+                .hasAnyRole("ADMIN","WAREHOUSE_OPERATOR","DEMO_VIEWER")
             .requestMatchers(HttpMethod.GET,"/api/v1/system","/api/v1/products/**","/api/v1/warehouses/**","/api/v1/orders/**","/api/v1/inventory/balances","/api/v1/inventory/availability").hasAnyRole("ADMIN","WAREHOUSE_OPERATOR","SALES_OPERATOR")
             .requestMatchers("/api/v1/products/**","/api/v1/warehouses/**").hasRole("ADMIN")
             .requestMatchers("/api/v1/customers/**","/api/v1/orders/**").hasAnyRole("ADMIN","SALES_OPERATOR")
