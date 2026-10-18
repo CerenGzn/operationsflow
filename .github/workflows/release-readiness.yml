@@ -1,0 +1,37 @@
+name: Release readiness (no deployment)
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'Full 40-character SHA of the current main commit'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require a manual run from main in this repository
+        env:
+          RUN_EVENT: ${{ github.event_name }}
+          RUN_REF: ${{ github.ref }}
+          RUN_REPOSITORY: ${{ github.repository }}
+        run: |
+          test "$RUN_EVENT" = workflow_dispatch
+          test "$RUN_REF" = refs/heads/main
+          test "$RUN_REPOSITORY" = CerenGzn/operationsflow
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify exact main SHA and successful CI evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ inputs.commit_sha }}
+        run: python3 scripts/release_readiness.py

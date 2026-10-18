@@ -42,10 +42,9 @@ This is one demo instance, not a high-availability or production-certified servi
 
 ## Reviewer permissions
 
-The new **DEMO_VIEWER** role is the recommended portfolio role **after a separately
-approved deployment of Milestone 11**. This change does not deploy it or create an
-account. Until then, the live application's role options may still be the original
-three; do not substitute an operator account when read-only access is required.
+The owner reports **DEMO_VIEWER** and Flyway V8 are deployed. DEMO_VIEWER is the
+recommended portfolio role. Milestone 12 changes no live accounts or cloud settings;
+individual account provisioning still belongs to the owner.
 
 A viewer can read the dashboard, products/warehouses, stock balances/availability,
 and five field-limited reports: orders, inventory, low stock, movements and fulfillment.
@@ -75,11 +74,12 @@ The owner reported these successful live manual workflows:
 3. Create an order for 20 units; available stock changes from 100 to 80.
 4. Cancel the order; reservation release restores available stock to 100.
 5. Sign in as administrator after removing temporary bootstrap environment values.
+6. Pick, pack, prepare shipments and dispatch the whole order, deducting stock.
+7. Inspect dashboard reporting and authenticate with read-only DEMO_VIEWER access.
 
 These are manual smoke results, not comprehensive automated E2E coverage. The
 [CI evidence](verification.md) covers isolated tests and container smoke checks.
-It does not prove which commit is deployed. Full live fulfillment/dispatch, all
-roles, exports, concurrent users, quota exhaustion, recovery, sustained traffic
+It does not prove which commit is deployed. Exhaustive live role/endpoint checks, exports, concurrent users, quota exhaustion, recovery, sustained traffic
 and comprehensive Safari behavior remain unverified. Existing records need not
 still match the example quantities; do not present those values as live KPIs.
 

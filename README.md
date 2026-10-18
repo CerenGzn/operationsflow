@@ -82,7 +82,7 @@ modern browser. No local development tools or personal-file access are required.
 **Authentication is required:** there is no public signup or shared demo login.
 The owner can arrange an individual, temporary reviewer account privately.
 The new [DEMO_VIEWER role](docs/demo-viewer.md) is read-only for business data;
-it is available after a separately approved deployment, not assumed live yet.
+the owner reports DEMO_VIEWER and Flyway V8 have been deployed successfully.
 
 Render Free serves Spring Boot and the bundled React frontend from one HTTPS
 origin; Neon Free stores PostgreSQL data. The public URL is not a private network:
@@ -93,15 +93,24 @@ not guaranteed. Sessions are lost when the backend restarts.
 
 | Evidence | What it establishes |
 | --- | --- |
-| Owner-reported live manual smoke tests | Product, warehouse and customer creation; receipt of 100 units; order for 20 reducing available stock to 80; cancellation restoring it to 100; administrator login after removing bootstrap variables |
+| Owner-reported live manual smoke tests | Product, warehouse and customer creation; receipt of 100 units; order for 20 reducing available stock to 80; cancellation restoring it to 100; administrator login after removing bootstrap variables; picking, packing, shipment preparation, whole-order dispatch/stock deduction, reporting and DEMO_VIEWER access |
 | Automated CI on `main` | [Run 39154948445](https://github.com/CerenGzn/operationsflow/actions/runs/39154948445): 38 unit tests, 88 PostgreSQL integration tests, 64 frontend tests; builds, both npm audits (zero findings), Compose and both container smoke jobs passed |
-| Still unverified in the live deployment | Full fulfillment/dispatch, all role boundaries, reports/exports, concurrent users, recovery, sustained load and comprehensive Safari/browser E2E behavior |
+| Still unverified in the live deployment | Exhaustive role boundaries, report/export correctness, concurrent users, recovery, sustained load and comprehensive Safari/browser E2E behavior |
 
 The manual results were supplied by the owner; this documentation review did not
 probe the live application or inspect provider accounts. CI uses disposable test
 data and does not certify the deployed commit or cloud configuration. See the
 [live demo guide](docs/live-demo.md), [verification evidence](docs/verification.md)
 and [controlled deployment proposal](docs/controlled-deployments.md).
+
+## Release readiness (no deployment)
+
+After merging reviewed changes, the owner can run **Actions → Release readiness
+(no deployment)** from **main**, providing its full commit SHA. It requires successful
+main-push CI and all five CI jobs for that exact SHA. A green summary is evidence,
+not deployment approval: the owner must separately confirm an exact-commit Render
+deployment with Auto-Deploy Off. No deploy hook or production secret is needed.
+See the [browser release procedure](docs/controlled-deployments.md#browser-only-release-procedure).
 
 ## Full-stack Docker quick start
 
@@ -235,7 +244,7 @@ and both npm audit checks; it does not deploy the application.
 | --- | --- |
 | [Read-only reviewers](docs/demo-viewer.md) | Exact endpoint permissions, owner provisioning and V8 rollback limits |
 | [Live demo](docs/live-demo.md) | Reviewer access, owner-reported smoke tests, health and availability |
-| [Controlled deployments](docs/controlled-deployments.md) | Proposed approval, exact-commit checks and rollback procedure; not enabled |
+| [Controlled deployments](docs/controlled-deployments.md) | Manual release-readiness workflow, owner-only deployment decision and rollback limits |
 | [Free demo preparation](docs/free-demo-deployment.md) | Feasibility, security, owner-only setup and cost limits |
 | [Full-stack Docker](docs/full-stack-docker.md) | Build, bootstrap, run, health and cleanup |
 | [Architecture](docs/architecture.md) | Current modules, transaction boundaries, and trade-offs |
@@ -255,7 +264,8 @@ is deferred” in earlier milestones describe that stage, not the current applic
 ## Roadmap / Future Enhancements
 
 Planned, **not implemented**: complete
-browser E2E coverage; approved deployment automation and image supply-chain
+browser E2E coverage; separately approved deployment automation (readiness checks
+are implemented, deployment stays manual) and image supply-chain
 hardening; durable sessions and distributed throttling if scaling is needed;
 measured query/locking optimization; and separately designed pricing, partial
 shipments, returns and retention policies. Expanded live verification remains
