@@ -25,4 +25,6 @@ USER 10001
 ENV SPRING_PROFILES_ACTIVE=demo
 EXPOSE 10000
 # Render uses /actuator/health/demo, not Docker HEALTHCHECK. No process supervisor needed.
-ENTRYPOINT ["java", "-Xms64m", "-Xmx224m", "-Xss512k", "-XX:MaxMetaspaceSize=128m", "-XX:ReservedCodeCacheSize=32m", "-XX:MaxDirectMemorySize=16m", "-XX:+UseSerialGC", "-XX:ActiveProcessorCount=1", "-XX:+ExitOnOutOfMemoryError", "-jar", "/app/app.jar"]
+# Favor startup over peak JIT throughput on the explicitly constrained demo only.
+# See docs/startup-performance.md for measured costs and the rollback procedure.
+ENTRYPOINT ["java", "-XX:TieredStopAtLevel=1", "-Xms64m", "-Xmx224m", "-Xss512k", "-XX:MaxMetaspaceSize=128m", "-XX:ReservedCodeCacheSize=32m", "-XX:MaxDirectMemorySize=16m", "-XX:+UseSerialGC", "-XX:ActiveProcessorCount=1", "-XX:+ExitOnOutOfMemoryError", "-jar", "/app/app.jar"]

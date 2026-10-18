@@ -48,6 +48,15 @@ and interactive latency. Aim for headroom rather than merely avoiding one OOM.
 If startup repeatedly fails, RSS approaches the limit, or login is unusably slow,
 stop the free-hosting attempt; do not silently upgrade or weaken security.
 
+### Startup investigation result
+
+The [measured startup investigation](startup-performance.md) retains a demo-only
+C1 JIT limit. In two controlled comparisons, average initial readiness improved
+207.0 → 117.6s and restart 193.9 → 112.6s. Startup memory fit 512 MiB, but roughly
+two-minute starts and five-second logins remain unsuitable for a polished unattended
+recruiter link. Use a scheduled supervised review or walkthrough as the primary
+portfolio experience. This is CI evidence, not a Render deployment claim.
+
 ## Architecture and boundaries
 
 ```text

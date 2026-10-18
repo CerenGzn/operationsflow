@@ -18,9 +18,9 @@ import urllib.request
 
 
 def main():
-    variant = os.environ.get('STARTUP_JIT', 'default')
-    if variant not in ('default', 'c1'):
-        raise ValueError('STARTUP_JIT must be default or c1')
+    variant = os.environ.get('STARTUP_JIT', 'image')
+    if variant not in ('image', 'default', 'c1'):
+        raise ValueError('STARTUP_JIT must be image, default or c1')
     measurements = []
     name = 'operationsflow-bundled-ci'
     env = dict(os.environ)
@@ -35,7 +35,7 @@ def main():
                BOOTSTRAP_ADMIN_EMAIL='bundle-review@example.invalid',
                BOOTSTRAP_ADMIN_PASSWORD=secrets.token_urlsafe(32))
     password = env['BOOTSTRAP_ADMIN_PASSWORD']
-    env['JAVA_TOOL_OPTIONS'] = '-Xlog:startuptime=info -XX:TieredStopAtLevel=' + ('1' if variant == 'c1' else '4')
+    env['JAVA_TOOL_OPTIONS'] = '-Xlog:startuptime=info'
 
     def docker(*args):
         return subprocess.run(['docker', *args], env=env, check=True, capture_output=True, text=True)
@@ -124,9 +124,20 @@ def main():
             variables += ['BOOTSTRAP_ADMIN_EMAIL', 'BOOTSTRAP_ADMIN_PASSWORD']
         args = [item for variable in variables for item in ('-e', variable)]
         began = time.monotonic()
+        override = []
+        command = []
+        if variant != 'image':
+            # Optional reproducible comparison: change only the tier limit in the
+            # actual image command. Normal CI executes the unchanged image entrypoint.
+            entrypoint = json.loads(docker('image', 'inspect', '--format',
+                                          '{{json .Config.Entrypoint}}', 'operationsflow-demo:ci').stdout)
+            assert entrypoint[0] == 'java' and '-jar' in entrypoint
+            command = [arg for arg in entrypoint[1:] if not arg.startswith('-XX:TieredStopAtLevel=')]
+            command.insert(0, '-XX:TieredStopAtLevel=' + ('1' if variant == 'c1' else '4'))
+            override = ['--entrypoint', 'java']
         docker('run', '-d', '--name', name, '--network', name, '--memory=512m',
                '--memory-swap=512m', '--cpus=0.1', '-p', '127.0.0.1:18081:10000',
-               *args, 'operationsflow-demo:ci')
+               *args, *override, 'operationsflow-demo:ci', *command)
         deadline = time.monotonic() + 600
         while time.monotonic() < deadline:
             if docker('inspect', '--format', '{{.State.Running}}', name).stdout.strip() != 'true':

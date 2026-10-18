@@ -130,3 +130,11 @@ Local static checks passed: YAML parsing, both existing Compose configurations,
 Python script syntax, relative documentation links/anchors and `git diff --check`.
 The original local Dockerfiles, Compose files, dependency manifests and lockfile
 are unchanged. These checks do not establish Java compilation or runtime success.
+
+## Startup performance follow-up
+
+[Comparison runs and measurements](startup-performance.md) record a remeasured
+baseline, C1 candidate, phase offsets, startup memory, throttling and request-latency
+trade-offs. Both comparison workflows passed all existing checks. The normal CI
+smoke now verifies the real optimized image entrypoint and retains sanitized metrics;
+the optional baseline remains reproducible without changing business/security settings.
