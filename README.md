@@ -10,7 +10,7 @@ It demonstrates Java/Spring transaction design, PostgreSQL concurrency control,
 role-based security, and a React interface connected to real application APIs.
 
 The implementation is a **modular monolith** with one PostgreSQL database.
-Milestones 1–7 implement the application; Milestone 8 adds local containerization. Full-stack Docker supports local operation; there is no hosted demo or deployment workflow.
+Milestones 1–7 implement the application, with local containers and a bundled demo image added afterward. The owner operates a Render Free / Neon Free demo; GitHub Actions validates changes but does not deploy them.
 All development and test business records must be synthetic.
 
 ## Key Features
@@ -61,7 +61,7 @@ Redis, and microservices are not part of the current implementation.
 
 ```mermaid
 flowchart LR
-    UI[React / TypeScript] -->|Same-origin API via Vite development proxy| API[Spring Boot modular monolith]
+    UI[React / TypeScript] -->|Same-origin API: bundled demo or local proxy| API[Spring Boot modular monolith]
     API --> DB[(PostgreSQL)]
     API --- Modules[Catalog · Customers · Inventory · Orders · Fulfillment · Security · Audit · Reporting]
 ```
@@ -75,13 +75,31 @@ transaction, without inter-service HTTP or a message broker.
 See [architecture and trade-offs](docs/architecture.md) for boundaries, locking,
 audit behavior, and the difference between current-state KPIs and dated activity.
 
-## Public demo preparation
+## Live Demo
 
-A separate [Render Free + Neon Free preparation guide](docs/free-demo-deployment.md)
-and `Dockerfile.demo` support a single Spring Boot process serving the production
-React bundle. This is **prepared support, not a live deployment**. Free hosting is
-conditional on resource tests, current account eligibility and quotas; no permanent
-€0 availability is promised. Deployment, accounts and secrets require separate approval.
+**[Open OperationsFlow](https://operationsflow.onrender.com)** in Safari or another
+modern browser. No local development tools or personal-file access are required.
+**Authentication is required:** there is no public signup or shared demo login.
+The owner can arrange an individual, temporary reviewer account privately.
+
+Render Free serves Spring Boot and the bundled React frontend from one HTTPS
+origin; Neon Free stores PostgreSQL data. The public URL is not a private network:
+application authentication and backend permissions restrict operational access.
+Free services may sleep, take several minutes to become usable, or become
+unavailable when quotas are exhausted. Availability and permanent zero cost are
+not guaranteed. Sessions are lost when the backend restarts.
+
+| Evidence | What it establishes |
+| --- | --- |
+| Owner-reported live manual smoke tests | Product, warehouse and customer creation; receipt of 100 units; order for 20 reducing available stock to 80; cancellation restoring it to 100; administrator login after removing bootstrap variables |
+| Automated CI on `main` | [Run 39154948445](https://github.com/CerenGzn/operationsflow/actions/runs/39154948445): 38 unit tests, 88 PostgreSQL integration tests, 64 frontend tests; builds, both npm audits (zero findings), Compose and both container smoke jobs passed |
+| Still unverified in the live deployment | Full fulfillment/dispatch, all role boundaries, reports/exports, concurrent users, recovery, sustained load and comprehensive Safari/browser E2E behavior |
+
+The manual results were supplied by the owner; this documentation review did not
+probe the live application or inspect provider accounts. CI uses disposable test
+data and does not certify the deployed commit or cloud configuration. See the
+[live demo guide](docs/live-demo.md), [verification evidence](docs/verification.md)
+and [controlled deployment proposal](docs/controlled-deployments.md).
 
 ## Full-stack Docker quick start
 
@@ -113,8 +131,8 @@ uses a separate database volume.
 ## Getting Started
 
 These are optional development instructions for a machine or cloud workspace you
-control; they do not require sharing personal files. No browser-only hosted demo
-is currently provided.
+control; they do not require sharing personal files. Reviewers can instead use
+the authenticated live demo above without installing anything.
 
 **Prerequisites:** Java 21 JDK, curl for the Maven Wrapper, Node.js 22.12+ with npm
 (Node 22 is used in CI), and a working Docker daemon with Compose v2. Initial
@@ -170,7 +188,7 @@ built assets without the development API proxy and is not the full application.
 For macOS development, use a Java 21 JDK, Node 22, and Docker Desktop or a correctly
 configured Colima/Testcontainers socket. Apple Silicon should use ARM64 tools.
 Ensure ports 5432, 8080, and 5173 are available and preserve `backend/mvnw`'s
-executable bit. macOS and Safari operation have not been verified by this review.
+executable bit. Local macOS development and comprehensive Safari compatibility have not been verified by this review.
 
 ## Testing and CI
 
@@ -207,12 +225,14 @@ and both npm audit checks; it does not deploy the application.
 - Low-stock alerts cover established active SKU/warehouse balances; current KPIs
   do not reconstruct historical states. Reporting limits are documented explicitly.
 - No production load certification, coverage percentage, complete E2E suite, or
-  deployment success is claimed. A passing dependency audit is a point-in-time result.
+  production readiness is claimed. The live smoke results above are limited; a passing dependency audit is a point-in-time result.
 
 ## Project Documentation
 
 | Guide | Contents |
 | --- | --- |
+| [Live demo](docs/live-demo.md) | Reviewer access, owner-reported smoke tests, health and availability |
+| [Controlled deployments](docs/controlled-deployments.md) | Proposed approval, exact-commit checks and rollback procedure; not enabled |
 | [Free demo preparation](docs/free-demo-deployment.md) | Feasibility, security, owner-only setup and cost limits |
 | [Full-stack Docker](docs/full-stack-docker.md) | Build, bootstrap, run, health and cleanup |
 | [Architecture](docs/architecture.md) | Current modules, transaction boundaries, and trade-offs |
@@ -231,7 +251,9 @@ is deferred” in earlier milestones describe that stage, not the current applic
 
 ## Roadmap / Future Enhancements
 
-Planned, **not implemented**: actual hosted-demo validation and image supply-chain hardening; browser E2E tests; durable sessions and distributed throttling if
-scaling is needed; measured query/locking optimization; and separately designed
-pricing, partial shipments, returns, and retention policies. Hosting feasibility
-has been discussed, but no deployment is included in this containerization milestone.
+Planned, **not implemented**: a backend-enforced read-only reviewer role; complete
+browser E2E coverage; approved deployment automation and image supply-chain
+hardening; durable sessions and distributed throttling if scaling is needed;
+measured query/locking optimization; and separately designed pricing, partial
+shipments, returns and retention policies. Expanded live verification remains
+necessary; this project makes no high-availability or customer-usage claim.

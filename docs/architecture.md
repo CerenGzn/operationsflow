@@ -1,5 +1,10 @@
 # OperationsFlow architecture
 
+> Current hosting status: the owner now reports a live Render Free / Neon Free demo.
+> See [live demo](live-demo.md) and [controlled deployments](controlled-deployments.md).
+> Preparation/no-deployment statements below describe the earlier milestone; this
+> documentation update does not deploy or change provider settings.
+
 Application implementation through Milestone 7, with Milestone 8 local containerization.
 This describes one Spring Boot application, one React application, and one
 PostgreSQL database. It does not introduce architecture changes or hosting.

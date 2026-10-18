@@ -3,7 +3,49 @@
 Reviewed on **2026-10-18**. Results below are tied to a specific commit and run;
 they are not a promise that every future branch or environment passes.
 
-## Confirmed GitHub Actions evidence
+## Latest main baseline — Milestone 10 review
+
+- Commit: `fdf9ecd4c559c4e4e7d732bfd1437026fffce9ce` (merged Milestone 9).
+- [Run 39154948445](https://github.com/CerenGzn/operationsflow/actions/runs/39154948445),
+  push to `main`, successful on 2026-10-18 UTC. Run metadata, all five job outcomes,
+  and backend, frontend and demo-image logs were inspected.
+- Backend: 38 unit and 88 PostgreSQL integration tests; zero failures, errors or
+  skips; Maven verify and packaging succeeded.
+- Frontend: npm ci, typecheck, 64 tests across 10 files, production build and both
+  dependency audits passed. Both audits reported zero vulnerabilities.
+- Compose validation, full-stack container smoke, and bundled constrained-image
+  smoke passed. These jobs build images without publishing or deploying them.
+- At 512 MiB / 0.1 CPU, the bundled image reached readiness in **114.058 s**
+  initially and **109.336 s** after restart. Sampled peak Java RSS was **238.19 /
+  234.69 MiB**, and cgroup peak memory **227.93 / 224.26 MiB** respectively;
+  these different measurements are not interchangeable. This is CI evidence,
+  not a Render latency measurement or a load test.
+
+The [owner's manual live results](live-demo.md#verification-boundary) are a separate
+source of evidence. The deployed SHA, provider settings and live security headers
+were not inspected. This documentation branch must be assessed using its own PR
+checks; the baseline above does not claim those checks already passed.
+
+## Milestone 10 documentation checks
+
+Executed successfully in the cloud workspace:
+
+- `git diff --check`.
+- `docker compose --env-file .env.example config --quiet`.
+- `docker compose --env-file .env.example -f compose.full.yml config --quiet`.
+- Python standard-library check of relative Markdown files/heading anchors in all
+  six changed documents, plus targeted token/private-key/connection-string/hook
+  pattern checks. Manual diff review found no credentials or personal email values.
+
+This is a focused source/documentation review, not a penetration test or comprehensive
+secret scan. External link availability was not exhaustively checked; official Render
+reference pages were read, but live application/health URLs were intentionally not
+probed. Runtime code, dependencies, workflows and deployment configuration are unchanged.
+Maven, npm and container execution were not rerun locally for this documentation-only
+change; the current main CI evidence above is verified separately, and the new PR
+triggers the existing CI suite. Do not infer a new PR result from the baseline.
+
+## Historical GitHub Actions evidence (Milestone 7)
 
 - Commit: [`4a572c4115fd46fa2a0a2cc34e1313d26dca6a6c`](https://github.com/CerenGzn/operationsflow/commit/4a572c4115fd46fa2a0a2cc34e1313d26dca6a6c), merged Milestone 7 on `main`.
 - Run: [38976408820](https://github.com/CerenGzn/operationsflow/actions/runs/38976408820), push to `main`, completed successfully on 2026-10-16 UTC.
