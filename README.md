@@ -28,7 +28,7 @@ All development and test business records must be synthetic.
   stock rolls back the whole request.
 - **Authentication and authorization:** server-side sessions, BCrypt passwords,
   CSRF protection, login throttling, administrator-controlled accounts, and
-  ADMIN, WAREHOUSE_OPERATOR, and SALES_OPERATOR roles enforced in the backend.
+  ADMIN, WAREHOUSE_OPERATOR, SALES_OPERATOR and DEMO_VIEWER roles enforced in the backend.
 - **Fulfillment:** picking, quantity verification before packing, shipment tracking
   metadata, and atomic whole-order dispatch. Stock is deducted at dispatch;
   cancellation before shipment releases reserved stock.
@@ -48,7 +48,7 @@ business effect, not exactly-once network delivery.
 | --- | --- |
 | Backend | Java 21, Spring Boot 3.5.7, Spring Security, Spring Data JPA, JDBC, Maven Wrapper |
 | Frontend | React 19, TypeScript, Vite; React hooks and Fetch for API state |
-| Database | PostgreSQL 17, Flyway migrations V1–V7 |
+| Database | PostgreSQL 17, Flyway migrations V1–V8 |
 | API | REST, structured problem responses, OpenAPI / springdoc |
 | Testing | JUnit 5, Spring Boot Test, PostgreSQL Testcontainers, Vitest, Testing Library |
 | Tooling | Docker Compose for PostgreSQL or the full stack, GitHub Actions, npm lockfile and security audits |
@@ -81,6 +81,8 @@ audit behavior, and the difference between current-state KPIs and dated activity
 modern browser. No local development tools or personal-file access are required.
 **Authentication is required:** there is no public signup or shared demo login.
 The owner can arrange an individual, temporary reviewer account privately.
+The new [DEMO_VIEWER role](docs/demo-viewer.md) is read-only for business data;
+it is available after a separately approved deployment, not assumed live yet.
 
 Render Free serves Spring Boot and the bundled React frontend from one HTTPS
 origin; Neon Free stores PostgreSQL data. The public URL is not a private network:
@@ -231,6 +233,7 @@ and both npm audit checks; it does not deploy the application.
 
 | Guide | Contents |
 | --- | --- |
+| [Read-only reviewers](docs/demo-viewer.md) | Exact endpoint permissions, owner provisioning and V8 rollback limits |
 | [Live demo](docs/live-demo.md) | Reviewer access, owner-reported smoke tests, health and availability |
 | [Controlled deployments](docs/controlled-deployments.md) | Proposed approval, exact-commit checks and rollback procedure; not enabled |
 | [Free demo preparation](docs/free-demo-deployment.md) | Feasibility, security, owner-only setup and cost limits |
@@ -251,7 +254,7 @@ is deferred” in earlier milestones describe that stage, not the current applic
 
 ## Roadmap / Future Enhancements
 
-Planned, **not implemented**: a backend-enforced read-only reviewer role; complete
+Planned, **not implemented**: complete
 browser E2E coverage; approved deployment automation and image supply-chain
 hardening; durable sessions and distributed throttling if scaling is needed;
 measured query/locking optimization; and separately designed pricing, partial

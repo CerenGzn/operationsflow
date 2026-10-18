@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { request } from '../../shared/api/management';
 import { resetCsrf } from '../../shared/api/csrf';
-export type Role = 'ADMIN' | 'WAREHOUSE_OPERATOR' | 'SALES_OPERATOR';
+export type Role = 'ADMIN' | 'WAREHOUSE_OPERATOR' | 'SALES_OPERATOR' | 'DEMO_VIEWER';
 export interface SessionUser { id: string; email: string; displayName: string; role: Role; active: boolean; mustChangePassword: boolean; version: number }
 
 export function Login({ onLogin, notice }: { onLogin: (user: SessionUser) => void; notice: string }) {

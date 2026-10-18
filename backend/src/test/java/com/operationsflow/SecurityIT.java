@@ -35,6 +35,12 @@ class SecurityIT {
     @Container @ServiceConnection static final PostgreSQLContainer<?> postgres=new PostgreSQLContainer<>("postgres:17.6-alpine");
     @Autowired MockMvc mvc;@Autowired JdbcTemplate jdbc;@Autowired ObjectMapper json;@Autowired PasswordEncoder passwords;@Autowired TestRestTemplate http;
     @Autowired IdentityService identities;@Autowired ProductService products;@Autowired InventoryService inventory;@Autowired PlatformTransactionManager transactions;
+    @Autowired com.operationsflow.customers.application.CustomerService customers;
+    @Autowired com.operationsflow.orders.application.OrderService orders;
+    @Autowired com.operationsflow.fulfillment.application.FulfillmentService fulfillment;
+    @Autowired com.operationsflow.fulfillment.application.FulfillmentQueries fulfillmentQueries;
+    @Autowired @org.springframework.beans.factory.annotation.Qualifier("requestMappingHandlerMapping")
+    org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping mappings;
     private static final String PASSWORD="Synthetic-security-test-5!";
     private String hash;private Account admin;
     record Account(UUID id,String email,String role){}
@@ -222,4 +228,96 @@ class SecurityIT {
     @Test void bootstrapCannotCreateAnotherAdministratorAfterInitialization()throws Exception{
         assertThatThrownBy(()->identities.bootstrap("bootstrap@example.invalid",PASSWORD)).isInstanceOf(IllegalStateException.class).hasMessageContaining("empty user table");
     }
+    /** Snapshot every application table, including users/audit/idempotency, after authentication. */
+    private Map<String,List<String>> databaseSnapshot(){
+        var result=new TreeMap<String,List<String>>();
+        for(String table:jdbc.queryForList("select table_name from information_schema.tables where table_schema='operationsflow' and table_type='BASE TABLE' order by table_name",String.class)){
+            if(!table.matches("[a-z_]+"))throw new AssertionError("Unexpected fixture table");
+            result.put(table,jdbc.queryForList("select row_to_json(t)::text from operationsflow."+table+" t order by row_to_json(t)::text",String.class));
+        }
+        return result;
+    }
+    @Test void viewerAllowedReadsAreFieldLimitedAndDoNotChangeAnyApplicationTable()throws Exception{
+        var root=login(admin);use(root);
+        String key=UUID.randomUUID().toString().substring(0,16).toUpperCase(Locale.ROOT);
+        var product=products.create(new ProductContracts.Create("Synthetic viewer item","Synthetic description","VIEW-"+key));
+        var sku=product.skus().getFirst().id();UUID warehouse=UUID.randomUUID();
+        jdbc.update("insert into operationsflow.warehouse(id,code,name,address_line,city,postal_code,country_code,status,created_at,updated_at) values (?,?,'Synthetic warehouse','Example 1','Berlin','10115','DE','ACTIVE',now(),now())",warehouse,"V-"+key);
+        inventory.receive(UUID.randomUUID(),new InventoryContracts.Receipt(warehouse,sku,20,"Sensitive ledger reason"));
+        var customer=customers.create(new com.operationsflow.customers.api.CustomerContracts.Create("PRIVATE-"+key,"Sensitive customer name","Sensitive destination","Berlin","10115","DE"));
+        var order=orders.create(UUID.randomUUID(),new com.operationsflow.orders.api.OrderContracts.Create(customer.id(),List.of(new com.operationsflow.orders.api.OrderContracts.Line(sku,2))));
+        var task=fulfillmentQueries.order(order.id()).tasks().getFirst();
+        task=fulfillment.pick(task.id(),sku,new com.operationsflow.fulfillment.api.FulfillmentContracts.Pick(2L,task.version()));
+        task=fulfillment.pack(task.id(),new com.operationsflow.fulfillment.api.FulfillmentContracts.Pack(task.version(),List.of(new com.operationsflow.fulfillment.api.FulfillmentContracts.VerifiedLine(sku,2))));
+        fulfillment.shipment(task.id(),new com.operationsflow.fulfillment.api.FulfillmentContracts.PrepareShipment(task.version(),"Sensitive carrier","Sensitive tracking"));
+        SecurityContextHolder.clearContext();var viewer=login(account("DEMO_VIEWER",false));var before=databaseSnapshot();
+        var paths=new ArrayList<>(List.of("/api/v1/system","/api/v1/products","/api/v1/products/"+product.id(),"/api/v1/warehouses","/api/v1/warehouses/"+warehouse,"/api/v1/inventory/balances","/api/v1/inventory/availability?skuId="+sku,"/api/v1/analytics/dashboard"));
+        for(String kind:List.of("orders","inventory","low-stock","movements","fulfillment"))paths.add("/api/v1/reports/"+kind);
+        for(String path:paths){
+            String body=mvc.perform(get(path).session(viewer)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+            assertThat(body).doesNotContain("Sensitive customer name","Sensitive destination","Sensitive ledger reason","Sensitive carrier","Sensitive tracking",customer.id().toString(),admin.email(),hash,"passwordHash","actor_id","ownerReference","cancellationReason");
+        }
+        mvc.perform(get("/api/v1/reports/orders").param("query",order.orderNumber()).param("size","1").session(viewer))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(1)).andExpect(jsonPath("$.content[0].order_number").value(order.orderNumber()));
+        mvc.perform(get("/api/v1/reports/orders").param("query","Sensitive customer name").session(viewer))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(0));
+        mvc.perform(get("/api/v1/reports/movements").param("skuId",sku.toString()).session(viewer))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(2));
+        assertThat(databaseSnapshot()).isEqualTo(before);
+    }
+    @Test void viewerCannotInvokeAnyMappedBusinessMutationEvenWithValidCsrf()throws Exception{
+        var viewer=login(account("DEMO_VIEWER",false));var before=databaseSnapshot();int checked=0;
+        for(var mapping:mappings.getHandlerMethods().keySet())for(String path:mapping.getPatternValues()){
+            if(!path.startsWith("/api/v1/") || path.startsWith("/api/v1/auth/"))continue;
+            for(var method:mapping.getMethodsCondition().getMethods()){
+                if(!Set.of("POST","PUT","PATCH","DELETE").contains(method.name()))continue;
+                String concrete=path.replaceAll("\\{[^}]+\\}",UUID.randomUUID().toString());
+                var response=mutate(viewer,method.name(),concrete,Map.of("role","ADMIN")).getResponse();
+                assertThat(response.getStatus()).as(method+" "+path).isEqualTo(403);
+                assertThat(response.getContentAsString()).contains("FORBIDDEN");checked++;
+            }
+        }
+        assertThat(checked).isGreaterThanOrEqualTo(20);
+        for(String method:List.of("PUT","PATCH","DELETE"))assertThat(mutate(viewer,method,"/api/v1/products/"+UUID.randomUUID(),Map.of()).getResponse().getStatus()).isEqualTo(403);
+        mvc.perform(post("/api/v1/orders").session(viewer).contentType("application/json").content("{}"))
+            .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("CSRF_INVALID"));
+        assertThat(databaseSnapshot()).isEqualTo(before);
+    }
+    @Test void viewerCannotReadSensitiveEndpointsOrAnyExportOrUnknownFutureRoutes()throws Exception{
+        var viewer=login(account("DEMO_VIEWER",false));String id=UUID.randomUUID().toString();var before=databaseSnapshot();
+        for(String path:List.of("/api/v1/customers","/api/v1/customers/"+id,"/api/v1/orders","/api/v1/orders/"+id,
+            "/api/v1/fulfillment/tasks","/api/v1/fulfillment/orders/"+id,"/api/v1/fulfillment/shipments",
+            "/api/v1/inventory/movements","/api/v1/inventory/movements/"+id,"/api/v1/inventory/reservations","/api/v1/inventory/reservations/"+id,
+            "/api/v1/users","/api/v1/users/"+id,"/api/v1/audit-events","/api/v1/reports/audit","/api/v1/reports/shipments",
+            "/v3/api-docs","/swagger-ui.html","/actuator/env","/actuator/configprops","/api/v1/reports/future","/api/v1/future"))
+            mvc.perform(get(path).session(viewer)).andExpect(status().isForbidden());
+        for(String kind:List.of("orders","inventory","low-stock","movements","fulfillment","shipments","audit"))
+            mvc.perform(get("/api/v1/reports/"+kind+"/export").session(viewer)).andExpect(status().isForbidden());
+        mvc.perform(head("/api/v1/reports/orders").session(viewer)).andExpect(status().isForbidden());
+        assertThat(databaseSnapshot()).isEqualTo(before);
+    }
+    @Test void administratorCanProvisionViewerWhoMustChangePasswordAndCanBeRevoked()throws Exception{
+        var root=login(admin);String email="reviewer-"+UUID.randomUUID()+"@example.invalid";
+        var created=mutate(root,"POST","/api/v1/users",Map.of("email",email,"displayName","Synthetic reviewer","role","DEMO_VIEWER","password",PASSWORD));
+        assertThat(created.getResponse().getStatus()).isEqualTo(201);
+        var body=json.readTree(created.getResponse().getContentAsString());var reviewer=new Account(UUID.fromString(body.get("id").asText()),email,"DEMO_VIEWER");
+        assertThat(body.get("mustChangePassword").asBoolean()).isTrue();
+        assertThat(created.getResponse().getContentAsString()).doesNotContain(PASSWORD,"passwordHash");
+        var session=login(reviewer);
+        mvc.perform(get("/api/v1/products").session(session)).andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("PASSWORD_CHANGE_REQUIRED"));
+        String changed="Synthetic-reviewer-changed-11!";
+        assertThat(mutate(session,"POST","/api/v1/auth/change-password",Map.of("currentPassword",PASSWORD,"newPassword",changed)).getResponse().getStatus()).isEqualTo(204);
+        var fresh=login(reviewer,changed);mvc.perform(get("/api/v1/products").session(fresh)).andExpect(status().isOk());
+        assertThat(mutate(fresh,"PUT","/api/v1/users/"+reviewer.id(),update(reviewer,"ADMIN",true,1)).getResponse().getStatus()).isEqualTo(403);
+        long version=jdbc.queryForObject("select version from operationsflow.app_user where id=?",Long.class,reviewer.id());
+        assertThat(mutate(root,"PUT","/api/v1/users/"+reviewer.id(),update(reviewer,"DEMO_VIEWER",false,version)).getResponse().getStatus()).isEqualTo(200);
+        mvc.perform(get("/api/v1/products").session(fresh)).andExpect(status().isUnauthorized());
+        assertThat(jdbc.queryForObject("select role from operationsflow.app_user where id=?",String.class,admin.id())).isEqualTo("ADMIN");
+    }
+    @Test void viewerCanLogoutWithoutOperationalPrivileges()throws Exception{
+        var viewer=login(account("DEMO_VIEWER",false));
+        assertThat(mutate(viewer,"POST","/api/v1/auth/logout",Map.of()).getResponse().getStatus()).isEqualTo(204);
+        assertThat(viewer.isInvalid()).isTrue();
+    }
+
 }

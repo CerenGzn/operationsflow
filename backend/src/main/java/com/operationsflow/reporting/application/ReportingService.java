@@ -24,7 +24,7 @@ public class ReportingService {
         return new ReportPage(kind.path,spec.dateBasis(),analytics.asOf(),filter.range(),spec.columns(),reports.rows(spec,size,(long)page*size),page,size,total,(int)Math.min(Integer.MAX_VALUE,(total+size-1)/size));
     }
     public String export(ReportKind kind,ReportFilter filter){
-        ReportingAccess.require(kind);analytics.limit();var spec=reports.spec(kind,filter);var rows=reports.rows(spec,EXPORT_LIMIT+1,0);
+        ReportingAccess.requireExport(kind);analytics.limit();var spec=reports.spec(kind,filter);var rows=reports.rows(spec,EXPORT_LIMIT+1,0);
         if(rows.size()>EXPORT_LIMIT)throw new BusinessException("EXPORT_TOO_LARGE","More than 5,000 rows match. Narrow the filters before exporting; no partial export was generated.");
         return CsvWriter.write(spec.columns(),rows);
     }

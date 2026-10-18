@@ -141,4 +141,15 @@ class ReportingIT extends AuthenticatedTestSupport {
         mvc.perform(get("/api/v1/reports/audit/export").param("status","SYNTHETIC_ABSENT")).andExpect(status().isOk()).andExpect(header().string("Cache-Control","no-store")).andExpect(content().contentTypeCompatibleWith("text/csv"));
         assertThat(reporting.report(ReportKind.AUDIT,filter(null,null,"SYNTHETIC_LIMIT",""),0,20).content()).allSatisfy(row->assertThat(row).doesNotContainKeys("detail","email","password_hash"));
     }
+    @Test void viewerServiceGuardRejectsSensitiveReportsAndEveryExport(){
+        SecurityContextHolder.getContext().setAuthentication(identity(Role.DEMO_VIEWER));
+        for(var kind:ReportKind.values()){
+            assertThatThrownBy(()->reporting.export(kind,filter(null,null,"",""))).isInstanceOf(AccessDeniedException.class);
+            if(kind==ReportKind.AUDIT || kind==ReportKind.SHIPMENTS)
+                assertThatThrownBy(()->reporting.report(kind,filter(null,null,"",""),0,20)).isInstanceOf(AccessDeniedException.class);
+            else assertThat(reporting.report(kind,filter(null,null,"",""),0,20).content()).isEmpty();
+        }
+        assertThat(reporting.dashboard(range(),10).kpis().values()).containsOnly("0");
+    }
+
 }
