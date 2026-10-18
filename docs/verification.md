@@ -1,77 +1,106 @@
-# Milestone 1 execution record
+# Verification overview
 
-Executed on 2026-10-11 in `/workspace/operationsflow`. No commits, pushes,
-public deployment, additional permission requests, or MacBook access occurred.
-Only the README existed initially. The original README introduction is intact.
+Reviewed on **2026-10-18**. Results below are tied to a specific commit and run;
+they are not a promise that every future branch or environment passes.
 
-## Commands and results
+## Confirmed GitHub Actions evidence
 
-Commands grouped in one shell invocation are separated below. File-writing
-Python scripts are described by purpose; they created only repository files.
-All project-local caches and build logs from explicit verification are ignored.
+- Commit: [`4a572c4115fd46fa2a0a2cc34e1313d26dca6a6c`](https://github.com/CerenGzn/operationsflow/commit/4a572c4115fd46fa2a0a2cc34e1313d26dca6a6c), merged Milestone 7 on `main`.
+- Run: [38976408820](https://github.com/CerenGzn/operationsflow/actions/runs/38976408820), push to `main`, completed successfully on 2026-10-16 UTC.
+- Evidence inspected: run metadata, all three job outcomes/steps, backend and frontend job logs.
+- The run was named **Foundation CI**. This documentation PR renames only the
+  displayed workflow to **OperationsFlow CI**, keeping `.github/workflows/ci.yml`,
+  triggers, permissions, jobs, timeouts, commands, and security audits unchanged.
 
-| Command/action | Result |
+| Check | Confirmed result in that run |
 | --- | --- |
-| `pwd` | `/workspace/operationsflow` |
-| `rg --files --hidden -g '!.git'` | Only README initially |
-| `git status --short` | Clean initially |
-| `cat README.md` | Read existing two-line description |
-| `java -version` | OpenJDK 21.0.12.1 |
-| `mvn -version` | Exit 127: global Maven absent |
-| `node --version` | v24.19.0 |
-| `npm --version` | 11.9.0 |
-| `docker --version` | 28.4.0 |
-| `docker compose version` | v2.40.3 |
-| `env -u DOCKER_HOST -u DOCKER_CONTEXT -u DOCKER_TLS -u DOCKER_TLS_VERIFY -u DOCKER_CERT_PATH docker --host=unix:///var/run/docker.sock info --format '{{.ServerVersion}}'` | Socket connection denied: operation not permitted |
-| `curl --version` | curl 8.14.1 |
-| `curl -fsSL --max-time 30 https://repo.maven.apache.org/maven2/org/springframework/boot/spring-boot-starter-parent/maven-metadata.xml` (piped to `tail -18`) | curl exit 7: proxy unreachable |
-| `curl -fsSL --max-time 30 https://repo.maven.apache.org/maven2/org/springdoc/springdoc-openapi-starter-webmvc-ui/maven-metadata.xml` (piped to `tail -15`) | curl exit 7: proxy unreachable |
-| `npm view vite@7 version; npm view react@19 version; npm view vitest@3 version` | Registry query failed with EPERM; sequence interrupted, no version results obtained |
-| `mkdir -p docs` and Python scaffolding script | Created foundation configuration, source, tests, module boundaries, and CI |
-| `mkdir -p .cache/npm .cache/maven` | Created ignored repository-local cache directories |
-| `MAVEN_USER_HOME="$PWD/.cache/maven" ./backend/mvnw -f backend/pom.xml --batch-mode --no-transfer-progress -Dmaven.repo.local="$PWD/.cache/maven/repository" test package` | Exit 7: wrapper download blocked by proxy; tests/build did not start; output captured to `.cache/maven-build.log` and displayed with `cat` |
-| `npm --prefix frontend install --cache "$PWD/.cache/npm" --fetch-retries=0 --fetch-timeout=15000` | Exit 1: EPERM connecting to registry through proxy; no lockfile or installed dependencies; output captured to `.cache/npm-install.log` and displayed with `cat` |
-| `docker compose --env-file .env.example config --quiet` (first attempt) | YAML quoting error in healthcheck, subsequently fixed |
-| `sh -n backend/mvnw` | Passed |
-| `git diff --check` | Passed |
-| Python configuration correction | Fixed Compose healthcheck quoting; changed CI from unavailable lockfile/`npm ci` to explicit interim `npm install` |
-| `docker compose --env-file .env.example config --quiet` (after fix) | Passed, exit 0 |
-| `npm --prefix frontend --cache "$PWD/.cache/npm" run typecheck` | Exit 127: TypeScript not installed |
-| `npm --prefix frontend --cache "$PWD/.cache/npm" run build` | Exit 127: TypeScript not installed; Vite build not reached |
-| `npm --prefix frontend --cache "$PWD/.cache/npm" test` | Exit 127: Vitest not installed |
-| `MAVEN_USER_HOME="$PWD/.cache/maven" ./backend/mvnw -f backend/pom.xml --batch-mode --no-transfer-progress -Dmaven.repo.local="$PWD/.cache/maven/repository" verify` | Exit 7: wrapper download blocked; integration suite did not start |
-| Python documentation script | Extended README; added architecture and this execution record |
+| Maven verify / packaging | BUILD SUCCESS |
+| JUnit/Surefire | 25 tests; zero failures, errors, or skips |
+| PostgreSQL/Testcontainers/Failsafe | 85 tests; zero failures, errors, or skips |
+| Frontend dependency installation | `npm ci` succeeded |
+| TypeScript | `npm run typecheck` succeeded |
+| Vitest | 64 tests in 10 files passed |
+| Frontend production assets | `npm run build` succeeded |
+| npm audit, all dependencies | Zero reported vulnerabilities |
+| npm audit, production dependencies | Zero reported vulnerabilities |
+| Docker Compose configuration | Validation job succeeded; this alone does not prove application startup |
 
-The environment-status connector reported restricted networking with dependency
-hosts allowed, but actual shell connections failed. No proxy bypass or permission
-escalation was attempted. Skill documentation was read for cloud/Docker behavior;
-no unrelated repositories or local configuration/secret files were inspected.
+[Current workflow runs](https://github.com/CerenGzn/operationsflow/actions/workflows/ci.yml)
+are the source for newer results. The README badge tracks `main`; inspect a PR's
+own checks before treating its changes as verified. Dependency audits reflect
+advisories available at the time, not an enduring security guarantee.
 
-## Final static checks
+## Verification methods
 
-- Python standard-library validation parsed `backend/pom.xml`,
-  `frontend/package.json`, and `frontend/tsconfig.json`: passed.
-- Python assertion verified the original README introduction is unchanged: passed.
-- `sh -n backend/mvnw`: passed again.
-- `docker compose --env-file .env.example config --quiet`: passed again.
-- `git diff --check`: passed again.
-- `git status --short`: README modified; only the new foundation paths untracked.
-- Final Python edit set backend loopback binding and updated this report and
-  architecture notes; no business functionality was added.
-- Final repeated syntax/Compose/whitespace checks passed; `rg --files --hidden
-  -g '!.git' -g '!.cache'` listed the resulting repository files.
+Source inspection confirms tests for catalog constraints, stock oversell and
+release races, idempotency, rollback, deterministic order allocation, cancellation,
+whole-order dispatch, authentication/CSRF/roles, actor attribution, analytics,
+date boundaries, pagination, and CSV safety. Integration tests use PostgreSQL
+containers and explicit test identities with production security enabled.
 
-## Unresolved validation
+Frontend tests exercise screen states and request contracts using jsdom and
+mocked API responses. They are not real Safari or full browser-to-database tests.
+No coverage percentage or independent security certification is recorded.
 
-- Maven compilation, unit tests, packaging, and PostgreSQL integration tests have
-  **not passed or executed**; dependency download is blocked. Docker is separately
-  inaccessible, so Testcontainers also cannot run here.
-- Frontend installation, type checking, tests, and production build are blocked
-  by missing dependencies. A genuine package-lock.json cannot be produced here.
-- CI is configured but has not run; its frontend installation remains provisional
-  until a generated lockfile is available and the command changes to `npm ci`.
-- Runtime API/database/UI smoke tests and macOS steps remain unverified.
-- Compose configuration validation is not proof that containers start successfully.
+## Reproduce the checks
 
-Milestone 1 implementation is present, but its build/test acceptance gate remains
-open. Do not proceed to Milestone 2 on the assumption these checks passed.
+From the repository root, with Java 21, curl, Node 22.12+, npm, and a working
+Docker daemon available:
+
+```sh
+(cd backend && ./mvnw --batch-mode --no-transfer-progress verify)
+(cd frontend && npm ci)
+(cd frontend && npm run typecheck)
+(cd frontend && npm test)
+(cd frontend && npm run build)
+(cd frontend && npm audit --json)
+(cd frontend && npm audit --omit=dev --json)
+docker compose --env-file .env.example config --quiet
+sh -n backend/mvnw
+git diff --check
+```
+
+Maven `test` is a useful unit-only check. Maven `package` does not run the Failsafe
+integration phase and must not be presented as equivalent to `verify`. Integration
+tests must not be skipped to conceal unavailable Docker. Use the committed npm
+lockfile with `npm ci`; the application database `.env` is not needed for the
+Testcontainers-managed database configuration.
+
+## Local documentation checks (2026-10-18)
+
+Passed: 20 relative documentation links/anchors; JSON/XML manifest parsing;
+Maven Wrapper shell syntax; `git diff --check`; and
+`docker compose --env-file .env.example config --quiet`. Compose validation
+did not start containers or test database connectivity.
+
+The historical verification copy matches the original bytes. The workflow diff
+changes only its display name. Expected environment/key/build-output ignore rules
+and the `.env.example` exception were checked. Tracked filename screening found
+only the intentional `.env.example` template among sensitive-filename candidates;
+ignored local artifacts were counted without reading their contents. This is not
+a content-based or full-history secret scan.
+
+## Documentation-review scope and limitations
+
+This cleanup changes documentation and the CI display name only. Backend/frontend
+tests were **not executed locally for this review**; the passing results above
+were verified from GitHub Actions logs. Historical Maven/npm proxy failures and
+Docker socket restrictions must not be generalized to every current environment.
+No dependency download or socket bypass was attempted during this documentation task.
+
+The following are **not established** by the checked CI run:
+
+- Full browser E2E behavior or Safari/macOS compatibility.
+- A deployed application, public demo URL, cloud resource sizing, or hosted TLS/proxy behavior.
+- Production load capacity, availability, durable sessions, or backup restoration.
+- Absence of every secret or personal record in Git history. Filename/ignore-rule
+  checks are a limited hygiene review, not a comprehensive secret scan.
+
+## Historical evidence
+
+The original [Milestone 1 execution record](history/milestone-1-verification.md)
+is preserved byte-for-byte. It describes the **2026-10-11** environment, including
+blocked Maven/npm downloads, unavailable Docker, missing lockfile, and then-unrun
+CI. Those statements are historical and are superseded for the checked commit by
+the evidence above. Detailed milestone guides also retain their original scope
+and execution context rather than rewriting historical results.

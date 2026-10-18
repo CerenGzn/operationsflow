@@ -1,49 +1,131 @@
-# Foundation architecture
+# OperationsFlow architecture
 
-One backend Maven module, one frontend application, one PostgreSQL database.
-The backend root package is `com.operationsflow`. Business package boundaries
-are declared for identity, catalog, customers, inventory, orders, fulfillment,
-reporting, and audit; they contain no business implementation yet. Add API,
-application, domain, and persistence subpackages as each module gains behavior.
-Do not access another module's repositories directly.
+Current implementation through Milestone 7, checked against source on 2026-10-18.
+This describes one Spring Boot application, one React application, and one
+PostgreSQL database. It does not introduce architecture changes or hosting.
 
-`shared/api/SystemController` supplies a small versioned connectivity contract.
-The frontend separates app composition from its HTTP client. A cancellable fetch
-is enough for one foundation request; TanStack Query will be introduced when
-business server state arrives. Spring Security is deferred to Milestone 2 rather
-than adding temporary users or unfinished authorization.
+## Source map and boundaries
 
-Spring Boot 3.5.7 manages compatible JPA, Flyway, PostgreSQL driver, JUnit, and
-Testcontainers versions. Springdoc 2.8.14 targets Boot 3.x. Java 21, Maven 3.9.11,
-Maven Wrapper 3.3.2, React 19.1.1, TypeScript 5.9.3, and Vite 7.1.9 are fixed stable
-releases, not floating latest tags. Their downloads and combined build could not
-be verified in this environment; no claim of latest security patch status is
-made. Recheck patch releases when dependency access is available.
+| Location under `backend/src/main/java/com/operationsflow` | Responsibility |
+| --- | --- |
+| `catalog` | Products, immutable SKUs, active-catalog access, deactivation port |
+| `inventory` | Warehouse metadata, stock balances/ledger, reservations, allocation |
+| `customers` | Business customer metadata, versions, deactivation port |
+| `orders` | Idempotent creation, immutable snapshots, lifecycle and cancellation |
+| `fulfillment` | Warehouse tasks, picks, packing, shipment preparation and dispatch |
+| `security` | Sessions, CSRF, identities, roles, bootstrap and account revocation |
+| `audit` | Actor-attributed events and administrator-only history |
+| `reporting` | SQL aggregation, paginated reports and bounded CSV exports |
+| `shared` | API errors, pagination, common status and connectivity contract |
 
-The POSIX `mvnw` launcher downloads the official Apache Maven Wrapper JAR over
-HTTPS, then delegates distribution handling to MavenWrapperMain. Its properties
-pin both wrapper and Maven versions. The downloaded JAR is ignored. Java and
-curl are required; Linux and macOS are supported, not Windows batch execution.
+Modules use `api`, `application`, `domain`, and `persistence` subpackages where
+needed. The original `identity/package-info.java` is a foundation placeholder;
+authentication and user management are implemented in `security`.
 
-V1 creates only the `operationsflow` schema. Flyway's history is in `public`,
-and Hibernate uses `operationsflow` with `ddl-auto=validate`; there are no
-placeholder business tables. Later migrations are additive. Flyway runs before
-JPA initialization. All database connection settings are required environment
-variables; there is no fallback password in application configuration.
+Controllers expose validated DTOs. Application services coordinate transactions;
+domain types express rules; persistence uses JPA repositories or explicit JDBC.
+Orders use customer/inventory application boundaries; fulfillment uses the order
+application boundary and inventory consumption primitive. Deactivation ports
+avoid exposing another module's repository. These are package conventions within
+one Maven artifact, not independently deployed services or compiler-enforced modules.
 
-Compose provides PostgreSQL with persistent storage, a readiness check, and a
-loopback-only published port. Backend/frontend run on the host. This avoids
-adding image builds and container proxy setup before business development.
-Database and Testcontainers use the same PostgreSQL image version.
+Reporting deliberately reads operational tables through SQL projections. This
+couples report queries to the shared schema while avoiding business mutations
+and ORM entity traversal. There is no Kafka, RabbitMQ, Redis, or inter-module HTTP.
 
-The backend binds to loopback by default (override with `SERVER_ADDRESS` only
-when deliberately configuring a private runtime). Only health is exposed through Actuator; detailed components are hidden.
-Readiness includes the database; liveness does not. OpenAPI documents the custom
-endpoint. There is no authentication yet, so this milestone is for local use.
+## Transactional behavior
 
-Surefire runs the HTTP slice test; Failsafe runs `*IT` tests during `verify`.
-PostgreSQL tests check migration validity/repeatability, database readiness,
-OpenAPI generation, and restricted Actuator exposure. Frontend tests cover
-loading, success, HTTP failure, malformed JSON shape, and network failure.
-GitHub Actions runs independent backend, frontend, and Compose checks without
-publishing artifacts or deploying anything.
+- Catalog, customer, and warehouse metadata use JPA and optimistic versions.
+  Stock/order/fulfillment persistence uses explicit SQL for predictable locking.
+  Both participate in the Spring-managed PostgreSQL transactions.
+- Stock balances obey `0 <= reserved <= on_hand`; available stock is derived.
+  Ledger effects, counters, reservation state, idempotency responses, and business
+  audit events commit together or roll back together.
+- Operation/order ownership locks precede catalog/product, warehouse, and balance
+  locks. Within those groups, UUID ordering is deterministic. Creation also locks
+  the customer. See the detailed operation-specific orders in the milestone guides.
+- Allocation prefers the first warehouse by code/UUID that can fill the entire
+  order, otherwise splits in that priority. Business priority is distinct from
+  database lock order. Insufficient stock rejects the complete transaction.
+- Reservation states are ACTIVE → RELEASED or CONSUMED. Repeated terminal requests
+  cannot create a second stock effect. Order-owned reservations cannot be changed
+  through the manual inventory terminal endpoints.
+- Order states progress RESERVED → PROCESSING → READY_TO_SHIP → SHIPPED, with
+  cancellation allowed before shipment. Dispatch consumes every allocation in
+  one transaction; cancellation competes for the same order lock. No partial shipment.
+- API idempotency replays the original successful response for a matching key and
+  canonical payload. It does not make network delivery exactly once; clients
+  should retrieve current state after a replay when needed.
+
+Product and warehouse guard locks simplify inactive-record and allocation races
+but reduce throughput. This is a deliberate modest-scale trade-off, not a claim
+of production load certification. Database checks, unique constraints, foreign
+keys, and immutable-history triggers supplement service-level rules.
+
+## Security and audit
+
+Spring Security enforces deny-by-default request authorization with ADMIN,
+WAREHOUSE_OPERATOR, and SALES_OPERATOR roles. The [security guide](milestone-5.md)
+contains the complete matrix; fulfillment/reporting extend those existing scopes.
+Only CSRF initialization, login, and health are anonymous; login still requires
+CSRF. OpenAPI and audit history require ADMIN.
+
+Passwords use BCrypt cost 12. Cookie-only sessions are HttpOnly, SameSite=Strict,
+expire after 30 minutes idle, and are invalidated on logout/password change.
+Account security versions revoke stale sessions on their next request. There is
+no public signup, default credential, or authentication token in localStorage.
+Sessions and bounded login throttling remain process-local. Local HTTP does not
+set Secure by default; any future hosting must explicitly configure HTTPS,
+Secure cookies, trusted proxies, and operational safeguards.
+
+Business audit records share the operation transaction. Authentication events use
+separate short audit transactions. Legacy unauthenticated movements retain their
+original attribution. Append-only triggers do not protect against a database owner.
+
+## Frontend and reporting
+
+`frontend/src/app` composes role-aware screens; `features` contains management,
+inventory, orders, fulfillment, authentication, users, and analytics. Shared Fetch
+clients manage cookies, CSRF headers, structured errors, and session expiry.
+React hooks manage requests and abort obsolete reads; TanStack Query is not installed.
+Frontend visibility complements, but never replaces, backend permissions.
+
+Native SVG charts include exact-value tables. Dashboard KPIs describe current or
+all-time state; activity charts use bounded inclusive calendar date ranges in
+Europe/Berlin or UTC, converted to half-open instant boundaries. Reports run SQL
+aggregation/filtering in read-only REPEATABLE READ transactions, with statement
+limits, bounded pages, and a 5,000-row CSV limit. Audit reports are ADMIN-only;
+stock movements are unavailable to SALES_OPERATOR. See [metric definitions](milestone-7.md).
+
+Orders remain UNPRICED. No prices, revenue, invoices, or payments are inferred.
+
+## Database and runtime
+
+Flyway migrations V1–V7 own the schema; migration history is in `public` and
+application tables are in `operationsflow`. Hibernate uses `ddl-auto=validate`.
+V7 adds reporting indexes. Database connection values come from required
+`DB_URL`, `DB_USERNAME`, and `DB_PASSWORD` environment variables.
+
+Compose runs PostgreSQL 17.6 with a named volume, readiness check, and loopback-only
+published port. Java and Vite run as separate development processes. Vite proxies
+`/api` and `/actuator` to the backend; production asset serving is not configured.
+The backend defaults to loopback. Actuator exposes health only, with hidden
+component details; readiness includes PostgreSQL and liveness does not.
+
+There are no application Dockerfiles or deployment pipeline. Maven Wrapper pins
+Maven 3.9.11; the backend uses Java 21 / Spring Boot 3.5.7 / springdoc 2.8.14.
+The manifests and frontend lockfile are authoritative for dependency versions.
+The original [foundation architecture](https://github.com/CerenGzn/operationsflow/blob/4a572c4115fd46fa2a0a2cc34e1313d26dca6a6c/docs/architecture.md)
+remains available in Git history; its deferred-feature statements are historical.
+
+## Verification and open work
+
+Surefire runs unit tests; Failsafe runs PostgreSQL `*IT` tests during Maven verify.
+Vitest/Testing Library run component and API-client tests in jsdom. GitHub Actions
+runs backend, frontend, security audits, and Compose configuration validation.
+These are not a complete browser E2E suite, deployment proof, or coverage percentage.
+See [verification evidence](verification.md) for the checked run and remaining gaps.
+
+Future work includes hosted-runtime validation, browser E2E coverage, retention
+policies, durable sessions if needed, and performance measurement before replacing
+coarse locks or OFFSET pagination. These capabilities are not claimed as implemented.
