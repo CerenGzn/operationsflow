@@ -1,5 +1,5 @@
 
-name: Foundation CI
+name: OperationsFlow CI
 
 on:
   push:

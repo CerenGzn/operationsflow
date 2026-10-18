@@ -1,43 +1,114 @@
-# operationsflow
-B2B order, inventory and fulfillment management platform
+# OperationsFlow — B2B Order, Inventory & Warehouse Management Platform
 
+[![OperationsFlow CI](https://github.com/CerenGzn/operationsflow/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/CerenGzn/operationsflow/actions/workflows/ci.yml?query=branch%3Amain)
 
-## Milestone 1 — Foundation
+## Overview
 
-A Java 21 / Spring Boot modular monolith, React / TypeScript frontend, and
-PostgreSQL database. This milestone provides connectivity, schema migration,
-health checks, API documentation, and test/CI scaffolding only. Business modules
-and authentication are intentionally deferred. Run locally; do not expose this
-unauthenticated foundation publicly.
+OperationsFlow is a full-stack portfolio project for managing the operational
+journey from stock receipt to order allocation, warehouse fulfillment, and shipment.
+It demonstrates Java/Spring transaction design, PostgreSQL concurrency control,
+role-based security, and a React interface connected to real application APIs.
 
-The existing title and description above are preserved. These instructions were
-added to make the foundation runnable.
+The implementation is a **modular monolith** with one PostgreSQL database.
+Milestones 1–7 are implemented. There is no hosted demo or deployment workflow.
+All development and test business records must be synthetic.
 
-### Prerequisites
+## Key Features
 
-- Java 21 JDK; Maven is downloaded by `backend/mvnw` (curl required).
-- Node.js 22.12+ (Node 22 LTS recommended) and npm.
-- Docker with Docker Compose v2 and a running daemon.
-- Network access to Maven Central, npm, and Docker Hub on first setup.
+- **Catalog and warehouses:** products with unique immutable SKU codes, warehouse
+  metadata, search, pagination, versioned edits, and controlled deactivation.
+- **Inventory:** warehouse/SKU balances, receipts, adjustments, an append-only
+  movement ledger, and available stock derived as on-hand minus reserved.
+- **Stock consistency:** transactional reservations, deterministic database lock
+  ordering, idempotent stock operations, and one committed release effect even
+  when cancellation requests are repeated or concurrent.
+- **Customers and orders:** customer management, immutable order snapshots,
+  idempotent creation, and atomic allocation. Prefer one warehouse that can fill
+  the entire order; otherwise split by warehouse code priority. Insufficient
+  stock rolls back the whole request.
+- **Authentication and authorization:** server-side sessions, BCrypt passwords,
+  CSRF protection, login throttling, administrator-controlled accounts, and
+  ADMIN, WAREHOUSE_OPERATOR, and SALES_OPERATOR roles enforced in the backend.
+- **Fulfillment:** picking, quantity verification before packing, shipment tracking
+  metadata, and atomic whole-order dispatch. Stock is deducted at dispatch;
+  cancellation before shipment releases reserved stock.
+- **Analytics and reports:** database-driven KPIs, accessible SVG charts, date and
+  time-zone filters, seven report datasets, and permission-scoped CSV exports
+  capped at 5,000 rows with formula-injection protection.
+- **Audit attribution:** authenticated actors on new operational events, with
+  business audit entries committed alongside their successful operations.
 
-### Run with Docker Compose and local application processes
+**Orders are unpriced.** Unit totals are implemented; prices, currencies, revenue,
+invoicing, and payments are not. Exactly-once stock release means one committed
+business effect, not exactly-once network delivery.
 
-Compose runs PostgreSQL; Java and Vite run on the host for quick reloads.
-This milestone does not provide container images for the application services.
-All commands below start in the repository root.
+## Technology Stack
+
+| Area | Implementation |
+| --- | --- |
+| Backend | Java 21, Spring Boot 3.5.7, Spring Security, Spring Data JPA, JDBC, Maven Wrapper |
+| Frontend | React 19, TypeScript, Vite; React hooks and Fetch for API state |
+| Database | PostgreSQL 17, Flyway migrations V1–V7 |
+| API | REST, structured problem responses, OpenAPI / springdoc |
+| Testing | JUnit 5, Spring Boot Test, PostgreSQL Testcontainers, Vitest, Testing Library |
+| Tooling | Docker Compose for PostgreSQL, GitHub Actions, npm lockfile and security audits |
+
+Exact dependencies live in [backend/pom.xml](backend/pom.xml) and
+[frontend/package.json](frontend/package.json). TanStack Query, Kafka, RabbitMQ,
+Redis, and microservices are not part of the current implementation.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    UI[React / TypeScript] -->|Same-origin API via Vite development proxy| API[Spring Boot modular monolith]
+    API --> DB[(PostgreSQL)]
+    API --- Modules[Catalog · Customers · Inventory · Orders · Fulfillment · Security · Audit · Reporting]
+```
+
+Backend modules separate API contracts, application services, domain rules, and
+persistence. JPA supports catalog/customer/warehouse metadata; explicit SQL handles
+stock locks, order snapshots, fulfillment, security storage, and reporting.
+Business modules collaborate through application services and ports in the same
+transaction, without inter-service HTTP or a message broker.
+
+See [architecture and trade-offs](docs/architecture.md) for boundaries, locking,
+audit behavior, and the difference between current-state KPIs and dated activity.
+
+## Getting Started
+
+These are optional development instructions for a machine or cloud workspace you
+control; they do not require sharing personal files. No browser-only hosted demo
+is currently provided.
+
+**Prerequisites:** Java 21 JDK, curl for the Maven Wrapper, Node.js 22.12+ with npm
+(Node 22 is used in CI), and a working Docker daemon with Compose v2. Initial
+setup requires access to Maven Central, npm, and container registries.
+
+From the repository root:
 
 ```sh
 cp .env.example .env
-# Edit .env: use a local-only password and keep both password fields equal.
+# Edit .env privately; replace the local database password placeholders consistently.
 set -a
 . ./.env
 set +a
 docker compose up -d --wait postgres
+```
+
+Before the **first backend start**, follow the
+[first-administrator bootstrap procedure](docs/milestone-5.md#first-administrator-local-development--macos).
+There are no default accounts. Supply bootstrap values only through the process
+environment, never in tracked files or command arguments. After successful
+bootstrap, stop the backend, unset both bootstrap variables, and restart; leaving
+them configured against an initialized user table intentionally fails startup.
+
+```sh
 cd backend
 ./mvnw spring-boot:run
 ```
 
-In a second terminal, from the repository root:
+In another terminal, from the repository root:
 
 ```sh
 cd frontend
@@ -45,134 +116,86 @@ npm ci
 npm run dev
 ```
 
-Open the frontend at http://localhost:5173. Vite forwards `/api` and `/actuator`
-to http://localhost:8080 without broad CORS permissions. Override `BACKEND_URL`
-when starting Vite if the backend runs on a different port. This variable is
-server-side proxy configuration, not a browser secret.
+Open http://localhost:5173 and sign in. Use synthetic products, warehouses,
+customers, and stock receipts before creating orders. Vite proxies `/api` and
+`/actuator` to http://localhost:8080; `BACKEND_URL` changes that development proxy
+target. Compose runs **only PostgreSQL**, not the backend or frontend.
 
-- Connectivity: http://localhost:8080/api/v1/system
-- Database readiness: http://localhost:8080/actuator/health/readiness
-- Liveness: http://localhost:8080/actuator/health/liveness
-- OpenAPI JSON: http://localhost:8080/v3/api-docs
-- Swagger UI: http://localhost:8080/swagger-ui.html
+Readiness is available at http://localhost:8080/actuator/health/readiness.
+`/api/v1/system` requires authentication. OpenAPI at `/v3/api-docs` and Swagger UI
+at `/swagger-ui.html` require an ADMIN session. API clients must obtain CSRF tokens
+and authenticate as described in the
+[security guide](docs/milestone-5.md#security-boundary).
 
-Connectivity identifies the API; it is not a substitute for database readiness.
-No sample customer records or application credentials are seeded.
+Stop Java/Vite with Ctrl-C; `docker compose down` retains the database volume.
+Changing `.env` does not rotate a password in an existing PostgreSQL volume.
+Do not remove the volume unless its data is disposable. `vite preview` serves
+built assets without the development API proxy and is not the full application.
 
-Stop Java and Vite with Ctrl-C. `docker compose down` stops PostgreSQL and retains
-its named volume. Changing the PostgreSQL password in `.env` does not change an
-already-initialized database password. Do not delete the volume unless its data
-is disposable.
+For macOS development, use a Java 21 JDK, Node 22, and Docker Desktop or a correctly
+configured Colima/Testcontainers socket. Apple Silicon should use ARM64 tools.
+Ensure ports 5432, 8080, and 5173 are available and preserve `backend/mvnw`'s
+executable bit. macOS and Safari operation have not been verified by this review.
 
-### Verify
+## Testing and CI
+
+Run from the repository root:
 
 ```sh
-cd backend
-./mvnw test                 # MVC contract unit test; no Docker required
-./mvnw verify               # Also packages JAR and runs PostgreSQL Testcontainers
-cd ../frontend
-npm ci
-npm run typecheck
-npm test
-npm run build
-cd ..
+(cd backend && ./mvnw --batch-mode --no-transfer-progress verify)
+(cd frontend && npm ci && npm run typecheck && npm test && npm run build)
+(cd frontend && npm audit --json && npm audit --omit=dev --json)
 docker compose --env-file .env.example config --quiet
 ```
 
-Integration tests deliberately fail if Docker is unavailable; they never silently
-skip. For an explicitly limited build without PostgreSQL integration tests, use
-`./mvnw package`; report integration coverage separately. `vite preview` previews
-static assets only and has no backend proxy; use `npm run dev` for the connected
-foundation UI.
+Maven `test` runs unit tests; `verify` also packages the backend and runs the
+PostgreSQL integration suite. Docker is required for Testcontainers; unavailable
+Docker is a failure, not a successful skipped integration run. Frontend tests
+use jsdom and API fixtures, not a complete browser-to-database E2E environment.
 
-Frontend dependency installation is reproducible through the committed
-`frontend/package-lock.json`; use `npm ci` locally and in CI. The merged
-foundation was verified by GitHub Actions. Historical cloud restrictions are
-recorded in [foundation verification](docs/verification.md).
+[Verification evidence](docs/verification.md) records the checked commit, GitHub
+Actions run, test counts, commands, and unverified scenarios. The badge tracks
+`main`, not necessarily a feature branch. CI preserves backend, frontend, Compose,
+and both npm audit checks; it does not deploy the application.
 
-### macOS setup
+## Security and Demo Limitations
 
-Install a Java 21 JDK (for example Temurin), Node 22 LTS, and Docker Desktop with
-Compose v2. On Apple Silicon use native ARM64 installations; the PostgreSQL image
-supports multiple architectures. Start Docker Desktop before running integration
-tests. Colima is an alternative if its Docker socket is correctly configured for
-Testcontainers; do not disable the tests to hide socket problems.
+- No public signup, default credentials, real customer fixtures, or published demo accounts.
+- Sessions and login-throttle buckets are in memory for one backend process;
+  restarts invalidate sessions/reset limiter state. No multi-replica guarantee.
+- Local HTTP defaults to non-Secure cookies. Hosting requires HTTPS, Secure
+  cookies, trusted-proxy configuration, and a reviewed operational setup.
+- Whole-order dispatch is supported; partial shipments, carrier APIs, returns,
+  and per-user warehouse assignments are deferred.
+- Audit history is append-only for ordinary application writes, not tamper-proof
+  against a database administrator. Idempotency records currently have no cleanup.
+- Low-stock alerts cover established active SKU/warehouse balances; current KPIs
+  do not reconstruct historical states. Reporting limits are documented explicitly.
+- No production load certification, coverage percentage, complete E2E suite, or
+  deployment success is claimed. A passing dependency audit is a point-in-time result.
 
-```sh
-export JAVA_HOME=$(/usr/libexec/java_home -v 21)
-java -version
-node --version
-docker info
-docker compose version
-```
+## Project Documentation
 
-Then follow the run and verification steps above in your macOS checkout. Ports
-5432, 8080, and 5173 must be available. Start with about 4 GB of Docker memory and
-increase it if PostgreSQL test containers run out of resources. Preserve the
-executable bit on `backend/mvnw`. CI uses Linux, so import filename case must
-match exactly. No local MacBook setup was inspected or changed; these steps
-remain unverified on macOS.
+| Guide | Contents |
+| --- | --- |
+| [Architecture](docs/architecture.md) | Current modules, transaction boundaries, and trade-offs |
+| [Verification](docs/verification.md) | Current CI evidence, commands, and limitations |
+| [Milestone 2](docs/milestone-2.md) | Catalog/SKU/warehouse design and original scope |
+| [Milestone 3](docs/milestone-3.md) | Inventory ledger, lock order, reservations, and retries |
+| [Milestone 4](docs/milestone-4.md) | Customers, order snapshots, allocation, and cancellation |
+| [Milestone 5](docs/milestone-5.md) | Bootstrap, sessions, role matrix, and audit attribution |
+| [Milestone 6](docs/milestone-6.md) | Picking, packing, shipment, and dispatch concurrency |
+| [Milestone 7](docs/milestone-7.md) | KPI definitions, date semantics, reports, and CSV safety |
+| [Dependency security review](docs/frontend-dependency-security.md) | Historical Vite/Vitest vulnerability remediation |
+| [Milestone 1 verification history](docs/history/milestone-1-verification.md) | Original execution record, preserved unchanged |
 
-See [architecture](docs/architecture.md) for package boundaries and dependency
-choices. No deployment or publishing workflow is included.
+Milestone guides retain their original context. Statements such as “authentication
+is deferred” in earlier milestones describe that stage, not the current application.
 
+## Roadmap / Future Enhancements
 
-## Milestone 2 — Products, SKUs and warehouses
-
-The workspace now has live product and warehouse management screens. Start the
-same PostgreSQL/backend/frontend processes above; Flyway applies V2 automatically.
-No business data is seeded. Use synthetic records for development.
-
-Products have a name, description, status and one or more immutable globally
-unique SKU codes. Warehouses have immutable unique codes and address metadata.
-Both screens support search, status filters, sorting, pagination, creation,
-editing, and explicit deactivation. Inactive records are read-only; deactivation
-cannot be undone in this milestone. Versions protect against stale edits.
-
-See [Milestone 2 API and design notes](docs/milestone-2.md) for contracts,
-constraints, tests and known limitations. Authentication, inventory, orders and
-stock reservations remain outside this milestone. Continue to run locally only.
-
-
-## Milestone 3 — Inventory and reservations
-
-Open **Inventory** in the workspace for warehouse/SKU balances, receipt and
-adjustment forms, movement history and reservation management. Flyway V3 applies
-on startup. Create synthetic products and warehouses before receiving stock.
-Available stock is derived from on-hand minus reserved. Every stock change has
-an immutable ledger entry and reason. Product/warehouse deactivation is blocked
-while stock remains.
-
-See [inventory contracts and concurrency design](docs/milestone-3.md) for lock
-ordering, idempotency, ownership, exactly-once release semantics, and the future
-order integration boundary. Reservations are explicit allocations; no order
-management or automatic warehouse allocation is included. The consume action
-is an inventory-only fulfillment deduction. Authentication is still deferred.
-
-## Milestone 4 — Customers and orders
-
-Open **Customers** to maintain synthetic business accounts and shipping addresses,
-then **Orders** to create, inspect and cancel orders. Flyway V4 applies on startup;
-existing setup commands and the committed npm lockfile are unchanged. Orders
-reserve stock atomically, preferring a single warehouse before splitting by
-warehouse code. Cancellation releases all allocations exactly once.
-
-Orders are explicitly **UNPRICED**: the catalog has no price model, so this
-milestone calculates unit totals only and does not invent prices or currencies.
-Order-owned reservations must be cancelled through Orders; manual inventory
-reservations retain their existing release/consume behavior. No order shipment,
-authentication or deployment is included.
-
-See [Milestone 4 design, API and verification](docs/milestone-4.md).
-
-## Authentication and access control (Milestone 5)
-
-Operations now require a server-side authenticated session. See [Milestone 5 security guide](docs/milestone-5.md) for the one-time administrator bootstrap, permission matrix, user/password workflows, CSRF API usage, audit attribution and local/production limitations. There are no default accounts or public signup. Existing unauthenticated curl examples require a session cookie and CSRF header for writes.
-
-## Warehouse fulfillment (Milestone 6)
-
-The Fulfillment workspace supports warehouse picking, verified packing, carrier/tracking records and atomic whole-order dispatch. Warehouses prepare independently; stock is consumed only when the complete order is dispatched. See [the fulfillment guide](docs/milestone-6.md) for lifecycle, cancellation rules, lock ordering, permissions and deliberate partial-shipment limitations.
-
-## Analytics and operational reports (Milestone 7)
-
-Dashboard is the authenticated landing screen. It combines current operational KPIs with date-filtered charts; Reports provides filtered, paginated operational datasets and complete CSV exports capped at 5,000 rows. Sales users cannot access stock movements or audit reports. See [metric definitions and report semantics](docs/milestone-7.md) for time-zone boundaries, low-stock scope, CSV safety, permissions and performance limits. No revenue is inferred from unpriced orders.
+Planned, **not implemented**: production container builds and hosted-demo
+validation; browser E2E tests; durable sessions and distributed throttling if
+scaling is needed; measured query/locking optimization; and separately designed
+pricing, partial shipments, returns, and retention policies. Hosting feasibility
+has been discussed, but no deployment is included in this repository cleanup.
