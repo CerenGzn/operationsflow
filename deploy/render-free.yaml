@@ -1,0 +1,27 @@
+# Preparation/reference only. Applying this file creates a live service: do not apply yet.
+# Initial creation deploys even with automatic deployment disabled.
+services:
+  - type: web
+    name: operationsflow-demo
+    runtime: docker
+    plan: free
+    region: frankfurt
+    branch: main
+    dockerfilePath: ./Dockerfile.demo
+    dockerContext: .
+    autoDeployTrigger: 'off'
+    healthCheckPath: /actuator/health/demo
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: demo
+      - key: DEMO_HTTPS_EDGE
+        value: 'true'
+      - key: DEMO_DB_HOST
+        sync: false
+      - key: DEMO_DB_NAME
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+# No database resources, disks, paid services, preview environments, or bootstrap secrets.

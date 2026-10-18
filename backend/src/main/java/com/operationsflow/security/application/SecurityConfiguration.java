@@ -31,7 +31,7 @@ public class SecurityConfiguration {
         http.exceptionHandling(e->e.authenticationEntryPoint((req,res,ex)->SecurityResponses.write(res,401,"AUTHENTICATION_REQUIRED","Sign in to continue."))
             .accessDeniedHandler((req,res,ex)->SecurityResponses.write(res,403,ex instanceof org.springframework.security.web.csrf.CsrfException?"CSRF_INVALID":"FORBIDDEN",ex instanceof org.springframework.security.web.csrf.CsrfException?"Refresh your session and retry with a valid CSRF token.":"Your role does not permit this action.")));
         http.authorizeHttpRequests(a->a
-            .requestMatchers(HttpMethod.GET,"/api/v1/auth/csrf","/actuator/health","/actuator/health/liveness","/actuator/health/readiness").permitAll()
+            .requestMatchers(HttpMethod.GET,"/api/v1/auth/csrf","/actuator/health","/actuator/health/liveness","/actuator/health/readiness","/actuator/health/demo").permitAll()
             .requestMatchers(HttpMethod.POST,"/api/v1/auth/login").permitAll()
             .requestMatchers("/api/v1/auth/session","/api/v1/auth/logout","/api/v1/auth/change-password").authenticated()
             .requestMatchers("/api/v1/users/**","/api/v1/audit-events/**","/v3/api-docs/**","/swagger-ui/**","/swagger-ui.html").hasRole("ADMIN")

@@ -10,7 +10,7 @@ It demonstrates Java/Spring transaction design, PostgreSQL concurrency control,
 role-based security, and a React interface connected to real application APIs.
 
 The implementation is a **modular monolith** with one PostgreSQL database.
-Milestones 1–7 are implemented. Full-stack Docker supports local operation; there is no hosted demo or deployment workflow.
+Milestones 1–7 implement the application; Milestone 8 adds local containerization. Full-stack Docker supports local operation; there is no hosted demo or deployment workflow.
 All development and test business records must be synthetic.
 
 ## Key Features
@@ -74,6 +74,14 @@ transaction, without inter-service HTTP or a message broker.
 
 See [architecture and trade-offs](docs/architecture.md) for boundaries, locking,
 audit behavior, and the difference between current-state KPIs and dated activity.
+
+## Public demo preparation
+
+A separate [Render Free + Neon Free preparation guide](docs/free-demo-deployment.md)
+and `Dockerfile.demo` support a single Spring Boot process serving the production
+React bundle. This is **prepared support, not a live deployment**. Free hosting is
+conditional on resource tests, current account eligibility and quotas; no permanent
+€0 availability is promised. Deployment, accounts and secrets require separate approval.
 
 ## Full-stack Docker quick start
 
@@ -205,6 +213,7 @@ and both npm audit checks; it does not deploy the application.
 
 | Guide | Contents |
 | --- | --- |
+| [Free demo preparation](docs/free-demo-deployment.md) | Feasibility, security, owner-only setup and cost limits |
 | [Full-stack Docker](docs/full-stack-docker.md) | Build, bootstrap, run, health and cleanup |
 | [Architecture](docs/architecture.md) | Current modules, transaction boundaries, and trade-offs |
 | [Verification](docs/verification.md) | Current CI evidence, commands, and limitations |
@@ -222,7 +231,7 @@ is deferred” in earlier milestones describe that stage, not the current applic
 
 ## Roadmap / Future Enhancements
 
-Planned, **not implemented**: hosted-demo validation and image supply-chain hardening; browser E2E tests; durable sessions and distributed throttling if
+Planned, **not implemented**: actual hosted-demo validation and image supply-chain hardening; browser E2E tests; durable sessions and distributed throttling if
 scaling is needed; measured query/locking optimization; and separately designed
 pricing, partial shipments, returns, and retention policies. Hosting feasibility
 has been discussed, but no deployment is included in this containerization milestone.
