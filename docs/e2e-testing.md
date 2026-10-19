@@ -11,7 +11,8 @@ production readiness, load capacity or exhaustive browser coverage.
 Each browser runs one cohesive lifecycle scenario with explicit named steps:
 
 - Administrator UI login, reload/session persistence, HttpOnly/SameSite cookie
-  attributes, missing-CSRF rejection, logout and subsequent 401/reload behavior.
+  attributes, missing-CSRF rejection, logout, rejected replay of the old session cookie
+  and subsequent 401/reload behavior.
 - Product/SKU, warehouse and customer creation through real forms.
 - Receipt of 100 units; on-hand/reserved/available assertions in the inventory table.
 - Order for 20 units: 100/20/80, cancellation: 100/0/100.
@@ -30,7 +31,7 @@ Each browser runs one cohesive lifecycle scenario with explicit named steps:
 Chromium and Playwright WebKit run sequentially with one worker, no retries and no
 fixed browser sleeps. WebKit is useful Safari-engine coverage on Linux, **not a test
 of the Safari application on macOS/iOS**. Firefox, mobile, exhaustive edge cases,
-server timeout expiration, multi-warehouse browser scenarios and browser-level
+server timeout expiration, HTTPS/Secure-cookie behavior, multi-warehouse browser scenarios and browser-level
 concurrency/load are not covered. Existing JUnit/PostgreSQL tests retain concurrency,
 role and transactional coverage. A lifecycle failure stops its dependent steps; CI
 reports two browser cases, not one independent test per workflow operation.

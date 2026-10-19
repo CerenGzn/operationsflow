@@ -111,7 +111,7 @@ test('real operational lifecycle and read-only reviewer security', async ({ page
       await viewer.getByLabel('Current password', { exact: true }).fill(temporary);
       await viewer.getByLabel('New password', { exact: true }).fill(password);
       await viewer.getByLabel('Confirm new password', { exact: true }).fill(password);
-      await viewer.getByRole('button', { name: 'Change password', exact: true }).click();
+      await viewer.getByRole('main').getByRole('button', { name: 'Change password', exact: true }).click();
       await expect(viewer.getByRole('heading', { name: 'Sign in' })).toBeVisible();
       await login(viewer, email, password);
       await expect(viewer.getByText('Read-only demo · Shared synthetic data · No business changes or exports')).toBeVisible();
@@ -185,9 +185,12 @@ test('real operational lifecycle and read-only reviewer security', async ({ page
     await expect(page.getByRole('alert')).toHaveCount(0);
   });
   await test.step('logout invalidates the authenticated session', async () => {
+    const oldSession = (await page.context().cookies()).find(c => c.name === 'JSESSIONID');
+    expect(Boolean(oldSession)).toBe(true);
     await page.getByRole('button', { name: 'Sign out', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
     expect((await page.request.get('/api/v1/auth/session')).status()).toBe(401);
+    expect((await page.request.get('/api/v1/auth/session', { headers: { Cookie: `JSESSIONID=${oldSession!.value}` } })).status()).toBe(401);
     await page.reload();
     await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
   });
