@@ -23,7 +23,7 @@ export default class SafeReporter implements Reporter {
     if (result.status !== 'passed') console.log('See sanitized action trace and masked screenshot; raw error text withheld.');
   }
   onError() { console.log('Runner error; raw details withheld to protect credentials.'); }
-  onEnd(result: FullResult) {
+  async onEnd(result: FullResult) {
     console.log(`Browser suite: ${result.status}; ${this.passed} passed, ${this.notPassed} not passed`);
     if (result.status !== 'passed' || this.notPassed > 0 || this.passed === 0) {
       mkdirSync('safe-artifacts', { recursive: true });
