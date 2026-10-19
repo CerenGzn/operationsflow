@@ -48,14 +48,13 @@ business effect, not exactly-once network delivery.
 | --- | --- |
 | Backend | Java 21, Spring Boot 3.5.7, Spring Security, Spring Data JPA, JDBC, Maven Wrapper |
 | Frontend | React 19, TypeScript, Vite; React hooks and Fetch for API state |
-| Database | PostgreSQL 17, Flyway migrations V1–V8 |
+| Database | PostgreSQL 17, Flyway migrations V1–V9 |
 | API | REST, structured problem responses, OpenAPI / springdoc |
-| Testing | JUnit 5, Spring Boot Test, PostgreSQL Testcontainers, Vitest, Testing Library |
+| Testing | JUnit 5, Spring Boot Test, PostgreSQL/RabbitMQ Testcontainers, Vitest, Testing Library |
 | Tooling | Docker Compose for PostgreSQL or the full stack, GitHub Actions, npm lockfile and security audits |
 
 Exact dependencies live in [backend/pom.xml](backend/pom.xml) and
-[frontend/package.json](frontend/package.json). TanStack Query, Kafka, RabbitMQ,
-Redis, and microservices are not part of the current implementation.
+[frontend/package.json](frontend/package.json). Spring AMQP / RabbitMQ is an optional local/CI integration. TanStack Query, Kafka, Redis, and microservices are not part of the current implementation.
 
 ## Architecture
 
@@ -70,10 +69,27 @@ Backend modules separate API contracts, application services, domain rules, and
 persistence. JPA supports catalog/customer/warehouse metadata; explicit SQL handles
 stock locks, order snapshots, fulfillment, security storage, and reporting.
 Business modules collaborate through application services and ports in the same
-transaction, without inter-service HTTP or a message broker.
+transaction, without inter-service HTTP. Optional event delivery runs after the business transaction commits.
 
 See [architecture and trade-offs](docs/architecture.md) for boundaries, locking,
 audit behavior, and the difference between current-state KPIs and dated activity.
+
+## Optional event-driven integration (Milestone 13)
+
+Order reservation, cancellation and whole-order dispatch append minimal versioned
+outbox events in the same PostgreSQL transaction. An explicitly enabled `messaging`
+profile publishes with RabbitMQ confirmations and mandatory returns; a transactional
+inbox deduplicates delivery into an operational event ledger. Delivery is at least
+once, with bounded retries, recoverable leases and a dead-letter queue.
+
+**Messaging is local/CI only and is NOT deployed to the Render Free live demo.**
+Default and `demo` profiles do not connect to RabbitMQ; synchronous business
+workflows remain independent of broker availability. Pending events accumulate
+when publishing is disabled. See [event contracts, startup, recovery, tests and
+limitations](docs/event-driven-messaging.md). The separate
+[Messaging integration workflow](.github/workflows/messaging.yml) must also pass
+before review; the existing manual release-readiness workflow checks the original
+five-job CI workflow, not this additional workflow.
 
 ## Live Demo
 

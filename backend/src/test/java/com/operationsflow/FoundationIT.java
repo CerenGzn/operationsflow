@@ -24,6 +24,7 @@ class FoundationIT extends AuthenticatedTestSupport {
     @ServiceConnection
     static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:17.6-alpine");
 
+    @Autowired org.springframework.context.ApplicationContext context;
     @Autowired JdbcTemplate jdbc;
     @Autowired Flyway flyway;
     @Autowired MockMvc mvc;
@@ -31,9 +32,15 @@ class FoundationIT extends AuthenticatedTestSupport {
     @Test
     void migratesEmptyPostgresAndSecondMigrationIsANoOp() {
         assertThat(jdbc.queryForObject("select count(*) from information_schema.schemata where schema_name = 'operationsflow'", Integer.class)).isEqualTo(1);
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("8");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("9");
         flyway.validate();
         assertThat(flyway.migrate().migrationsExecuted).isZero();
+    }
+
+    @Test
+    void defaultApplicationHasNoBrokerConnectionOrPublisher() {
+        assertThat(context.getBeansOfType(org.springframework.amqp.rabbit.connection.ConnectionFactory.class)).isEmpty();
+        assertThat(context.getBeansOfType(com.operationsflow.messaging.application.OutboxPublisher.class)).isEmpty();
     }
 
     @Test

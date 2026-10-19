@@ -9,6 +9,8 @@ server:
         same-site: strict
   address: ${SERVER_ADDRESS:127.0.0.1}
 spring:
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.amqp.RabbitAutoConfiguration
   application:
     name: operationsflow
   jackson:
