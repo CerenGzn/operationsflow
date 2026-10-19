@@ -42,16 +42,17 @@ is a separate reviewed recovery process, not a bypass input to this verifier.
 
 The verifier makes GET requests only to the GitHub API for this repository:
 
-1. Verify main's exact ref and the active `.github/workflows/ci.yml` workflow identity.
+1. Verify main's exact ref and the active `.github/workflows/ci.yml` and `.github/workflows/e2e.yml` workflow identities.
 2. Find exactly one main-branch **push** run of that workflow for the SHA. No PR run,
    different repository/workflow, missing run or multiple matches is accepted.
 3. Require `completed` / `success` on the run's current attempt.
 4. Read the explicit attempt's paginated jobs and require exactly one successful
-   `backend`, `frontend`, `compose`, `containers` and `demo-image`. Check SHA, run ID
+   `backend`, `frontend`, `compose`, `containers` and `demo-image` in application CI,
+   plus exactly `browser-e2e` in Browser E2E. Check SHA, run ID
    and attempt provenance for every job. Pending, skipped, neutral, failed, duplicate,
    missing and unexpected jobs all fail closed. Existing job names are an explicit
    policy contract; future CI job changes require reviewing this allowlist.
-5. Recheck run selection, current attempt and main before reporting success. API
+5. Recollect both workflows, rechecking run selection, current attempt and main before reporting success. API
    failures, redirects, incomplete/inconsistent pagination or schema changes fail
    closed. Responses/errors do not echo token values or arbitrary API bodies.
 
@@ -63,8 +64,8 @@ fixtures on push/PR; it does not perform a readiness decision or deployment.
 
 `.github/workflows/ci.yml`, npm ci, audits, container checks, application logic,
 authentication, database migrations and `Dockerfile.demo` remain unchanged. The
-readiness decision targets the existing five-job CI workflow, not every unrelated
-workflow in the repository; the policy-test workflow must also be green when reviewing
+readiness decision targets the existing five-job CI workflow and Browser E2E, not every
+unrelated workflow in the repository; messaging remains a separate review requirement and the policy-test workflow must also be green when reviewing
 changes to the verifier itself.
 
 ## Browser-only release procedure
@@ -75,7 +76,8 @@ is Off. Otherwise merging could deploy independently of this workflow. The histo
 If it is not Off, pause and handle that cloud change separately; this task changes none.
 
 1. Approve and merge the reviewed PR. Copy the full resulting **main commit SHA**.
-2. Wait for OperationsFlow CI on that main push to pass all five jobs. Do not use
+2. Wait for OperationsFlow CI on that main push to pass all five jobs and Browser E2E
+   to pass its browser-e2e job for the same SHA. Do not use
    only the PR check or a green badge for an older commit. For verifier changes,
    also require Release readiness tests to pass.
 3. GitHub → repository → **Actions → Release readiness (no deployment) → Run workflow**.
