@@ -19,7 +19,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.*;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.testcontainers.containers.*;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.containers.RabbitMQContainer;
 import org.testcontainers.junit.jupiter.*;
 import static org.assertj.core.api.Assertions.*;
 import static org.awaitility.Awaitility.await;
