@@ -89,7 +89,7 @@ when publishing is disabled. See [event contracts, startup, recovery, tests and
 limitations](docs/event-driven-messaging.md). The separate
 [Messaging integration workflow](.github/workflows/messaging.yml) must also pass
 before review; the existing manual release-readiness workflow checks the original
-five-job CI workflow, not this additional workflow.
+five-job CI workflow plus Browser E2E; messaging remains an additional manual review requirement.
 
 ## Live Demo
 
@@ -123,7 +123,7 @@ and [controlled deployment proposal](docs/controlled-deployments.md).
 
 After merging reviewed changes, the owner can run **Actions → Release readiness
 (no deployment)** from **main**, providing its full commit SHA. It requires successful
-main-push CI and all five CI jobs for that exact SHA. A green summary is evidence,
+main-push CI, all five application CI jobs, and Browser E2E for that exact SHA. A green summary is evidence,
 not deployment approval: the owner must separately confirm an exact-commit Render
 deployment with Auto-Deploy Off. No deploy hook or production secret is needed.
 See the [browser release procedure](docs/controlled-deployments.md#browser-only-release-procedure).
@@ -231,7 +231,7 @@ docker compose --env-file .env.example config --quiet
 Maven `test` runs unit tests; `verify` also packages the backend and runs the
 PostgreSQL integration suite. Docker is required for Testcontainers; unavailable
 Docker is a failure, not a successful skipped integration run. Frontend tests
-use jsdom and API fixtures, not a complete browser-to-database E2E environment.
+use jsdom and API fixtures. The separate [Playwright E2E suite](docs/e2e-testing.md) uses real Chromium/WebKit browsers, the production frontend build, Spring Boot and disposable PostgreSQL.
 
 [Verification evidence](docs/verification.md) records the checked commit, GitHub
 Actions run, test counts, commands, and unverified scenarios. The badge tracks
@@ -280,9 +280,20 @@ is deferred” in earlier milestones describe that stage, not the current applic
 ## Roadmap / Future Enhancements
 
 Planned, **not implemented**: complete
-browser E2E coverage; separately approved deployment automation (readiness checks
+broader browser E2E coverage; separately approved deployment automation (readiness checks
 are implemented, deployment stays manual) and image supply-chain
 hardening; durable sessions and distributed throttling if scaling is needed;
 measured query/locking optimization; and separately designed pricing, partial
 shipments, returns and retention policies. Expanded live verification remains
 necessary; this project makes no high-availability or customer-usage claim.
+
+### Isolated browser E2E
+
+[Browser E2E workflow](https://github.com/CerenGzn/operationsflow/actions/workflows/e2e.yml)
+adds real administrator and DEMO_VIEWER browser journeys, catalog/customer creation,
+receipt, reservation/cancellation, pick/pack/dispatch, stock deduction and reporting.
+Chromium and WebKit use synthetic, disposable data; they never test the public demo.
+See [setup, coverage, safe diagnostics and limitations](docs/e2e-testing.md).
+Successful exact-main Browser E2E is required by release-readiness verification in
+addition to existing application CI. This does not deploy anything or replace the
+owner's live verification. Final measured results belong to the feature PR's CI links.

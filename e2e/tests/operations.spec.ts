@@ -1,5 +1,5 @@
 import { test, expect, login, nav, write, secret } from './fixtures';
-import type { Page } from '@playwright/test';
+import { mkdir } from 'node:fs/promises';
 
 // The entire lifecycle belongs to one scenario: later assertions depend explicitly on earlier UI actions.
 // Each browser gets unique identifiers and a fresh context; no order dependencies between test cases.
@@ -7,6 +7,8 @@ test('real operational lifecycle and read-only reviewer security', async ({ page
   const suffix = crypto.randomUUID().slice(0, 8).toUpperCase();
   const sku = `SKU-${suffix}`, wh = `WH-${suffix}`, customer = `CUSTOMER-${suffix}`;
   let productId = '', skuId = '', warehouseId = '', customerId = '';
+  const baseline: Record<string, number> = {};
+  const metric = (name: string) => page.locator('article.kpi-card').filter({ has: page.getByRole('heading', { name, exact: true }) }).locator('strong');
   let cancelled: { id: string; orderNumber: string }, shipped: { id: string; orderNumber: string };
   await test.step('administrator login and session persistence', async () => {
     await login(page);
@@ -16,6 +18,9 @@ test('real operational lifecycle and read-only reviewer security', async ({ page
     const cookie = (await page.context().cookies()).find(c => c.name === 'JSESSIONID');
     expect(Boolean(cookie?.httpOnly && cookie.sameSite === 'Strict')).toBe(true);
     expect((await page.request.get('/api/v1/auth/session')).status()).toBe(200);
+    await expect(page.getByRole('heading', { name: 'Current operations' })).toBeVisible();
+    for (const name of ['Total orders', 'Cancelled orders', 'Shipped orders', 'Inventory units', 'Available units'])
+      baseline[name] = Number((await metric(name).innerText()).replaceAll(',', ''));
     expect((await page.request.post('/api/v1/orders', { data: {} })).status()).toBe(403); // Missing CSRF.
   });
   async function save(kind: string, fields: Record<string, string>) {
@@ -137,10 +142,18 @@ test('real operational lifecycle and read-only reviewer security', async ({ page
         [`products/${productId}/deactivate`, 'POST', { version: 0 }],
       ];
       for (const [path, method, data] of mutations) expect((await write(viewer, path, method, data)).status()).toBe(403);
+      for (const path of ['products', 'warehouses', 'inventory/balances', 'analytics/dashboard',
+        'reports/orders', 'reports/inventory', 'reports/low-stock', 'reports/fulfillment', 'reports/movements'])
+        expect((await viewer.request.get('/api/v1/' + path)).status()).toBe(200);
       for (const path of ['users', 'customers', 'orders', 'reports/audit', 'reports/orders/export'])
         expect((await viewer.request.get('/api/v1/' + path)).status()).toBe(403);
       expect(await (await page.request.get(`/api/v1/orders/${shipped.id}`)).json()).toEqual(before);
       await balance(100, 30, 70);
+    } catch (error) {
+      await mkdir('safe-artifacts', { recursive: true });
+      await viewer.screenshot({ path: `safe-artifacts/viewer-${suffix}.png`,
+        mask: [viewer.locator('input, textarea, select, .sidebar-note, .auth-card')], animations: 'disabled' }).catch(() => {});
+      throw error;
     } finally { await viewerContext.close(); }
   });
   await test.step('dispatch deducts stock once and reports the shipment', async () => {
@@ -166,6 +179,8 @@ test('real operational lifecycle and read-only reviewer security', async ({ page
     await nav(page, 'Dashboard');
     await expect(page.getByRole('heading', { name: 'Current operations' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Order volume', exact: true })).toBeVisible();
+    for (const [name, delta] of Object.entries({ 'Total orders': 2, 'Cancelled orders': 1, 'Shipped orders': 1, 'Inventory units': 70, 'Available units': 70 }))
+      await expect(metric(name)).toHaveText(String(baseline[name] + delta));
     await expect(page.getByRole('alert')).toHaveCount(0);
   });
   await test.step('logout invalidates the authenticated session', async () => {

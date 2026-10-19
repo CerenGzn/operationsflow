@@ -201,9 +201,6 @@ class TransportTests(unittest.TestCase):
         with self.assertRaises(r.NotReady): r.GitHub("")
 
 
-if __name__ == "__main__":
-    unittest.main()
-
 class ReleaseTests(unittest.TestCase):
     def fixture(self):
         primary, browser = Fixture(), Fixture()
@@ -246,3 +243,6 @@ class ReleaseTests(unittest.TestCase):
     def test_no_optional_bypass_for_browser_workflow(self):
         self.assertEqual(r.RELEASE_WORKFLOWS, ((r.WORKFLOW, r.REQUIRED_JOBS),
             ('.github/workflows/e2e.yml', frozenset({'browser-e2e'}))))
+
+if __name__ == "__main__":
+    unittest.main()

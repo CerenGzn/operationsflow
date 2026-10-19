@@ -24,6 +24,7 @@ jobs:
         working-directory: e2e
         run: |
           npm run typecheck
+          node --experimental-strip-types --test diagnostics.test.mjs
           npm audit
       - name: Install browser engines
         working-directory: e2e

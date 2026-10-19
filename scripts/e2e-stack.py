@@ -3,6 +3,7 @@
 import os
 from pathlib import Path
 import secrets
+import shutil
 import subprocess
 import sys
 import time
@@ -12,12 +13,13 @@ ROOT = Path(__file__).resolve().parents[1]
 def main():
     env = dict(os.environ)
     for key in list(env):
-        if key.startswith(('BOOTSTRAP_', 'E2E_', 'SPRING_PROFILES_')):
+        if key.startswith(('BOOTSTRAP_', 'E2E_', 'SPRING_PROFILES_', 'PLAYWRIGHT_')) or key in ('DEBUG', 'PWDEBUG', 'NODE_OPTIONS'):
             del env[key]
     env.update(POSTGRES_DB='operationsflow', POSTGRES_USER='operationsflow',
                POSTGRES_PASSWORD=secrets.token_urlsafe(32), SESSION_COOKIE_SECURE='false',
                APP_PORT='18081', BOOTSTRAP_ADMIN_EMAIL='browser-admin@example.invalid',
                BOOTSTRAP_ADMIN_PASSWORD=secrets.token_urlsafe(32))
+    shutil.rmtree(ROOT / 'e2e' / 'safe-artifacts', ignore_errors=True)
     project = 'operationsflow-e2e-' + secrets.token_hex(5)
     compose = ['docker', 'compose', '-p', project, '-f', 'compose.full.yml']
     bootstrap = project + '-bootstrap'
@@ -58,11 +60,13 @@ def main():
         return 1
     finally:
         subprocess.run(['docker', 'rm', '-f', bootstrap], capture_output=True)
+        shutil.rmtree(ROOT / 'e2e' / '.private-results', ignore_errors=True)
         # Only this invocation's random project; never shared/developer/production volumes.
         result = subprocess.run([*compose, 'down', '-v', '--remove-orphans'], cwd=ROOT,
                                 env=env, capture_output=True)
         if result.returncode:
             print('FAIL: isolated stack cleanup; remove the E2E project manually.', file=sys.stderr)
+            return 1
     return 0
 
 if __name__ == '__main__':
