@@ -21,7 +21,7 @@ class DemoViewerMigrationIT {
         for(String role:new String[]{"ADMIN","SALES_OPERATOR","WAREHOUSE_OPERATOR"})
             jdbc.update("insert into operationsflow.app_user(id,email,display_name,password_hash,role,must_change_password) values (?,?,?, ?,?,false)",UUID.randomUUID(),role.toLowerCase()+"@example.invalid","Synthetic migration user",hash,role);
         var before=jdbc.queryForList("select * from operationsflow.app_user order by email");
-        var flyway=Flyway.configure().dataSource(ds).load();assertThat(flyway.migrate().migrationsExecuted).isEqualTo(1);
+        var flyway=Flyway.configure().dataSource(ds).target("8").load();assertThat(flyway.migrate().migrationsExecuted).isEqualTo(1);
         assertThat(flyway.migrate().migrationsExecuted).isZero();
         assertThat(jdbc.queryForList("select * from operationsflow.app_user order by email")).isEqualTo(before);
         assertThat(jdbc.queryForObject("select count(*) from operationsflow.audit_event",Long.class)).isZero();

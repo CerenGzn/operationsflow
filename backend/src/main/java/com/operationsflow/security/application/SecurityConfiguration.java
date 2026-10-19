@@ -34,7 +34,7 @@ public class SecurityConfiguration {
             .requestMatchers(HttpMethod.GET,"/api/v1/auth/csrf","/actuator/health","/actuator/health/liveness","/actuator/health/readiness","/actuator/health/demo").permitAll()
             .requestMatchers(HttpMethod.POST,"/api/v1/auth/login").permitAll()
             .requestMatchers("/api/v1/auth/session","/api/v1/auth/logout","/api/v1/auth/change-password").authenticated()
-            .requestMatchers("/api/v1/users/**","/api/v1/audit-events/**","/v3/api-docs/**","/swagger-ui/**","/swagger-ui.html").hasRole("ADMIN")
+            .requestMatchers("/api/v1/users/**","/api/v1/audit-events/**","/api/v1/messaging/**","/v3/api-docs/**","/swagger-ui/**","/swagger-ui.html").hasRole("ADMIN")
             // Explicit viewer allowlist: no raw orders, destinations, tracking, ledger actors or exports.
             // Existing role matchers below retain their original privileges.
             .requestMatchers(HttpMethod.GET,"/api/v1/system","/api/v1/products","/api/v1/products/{id}",

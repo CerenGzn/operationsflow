@@ -1,0 +1,7 @@
+# Explicit local/CI opt-in. The demo profile always excludes messaging beans.
+operationsflow:
+  messaging:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME}
+    password: ${RABBITMQ_PASSWORD}

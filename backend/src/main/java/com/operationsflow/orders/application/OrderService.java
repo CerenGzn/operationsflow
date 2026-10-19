@@ -25,12 +25,14 @@ import com.operationsflow.shared.domain.BusinessException;
 public class OrderService {
     private final com.operationsflow.audit.application.AuditService audit;
     private final com.operationsflow.fulfillment.application.FulfillmentPlanning fulfillment;
+    private final com.operationsflow.messaging.application.OrderEvents events;
     private final OrderStore orders;
     private final CustomerService customers;
     private final OrderInventoryAccess allocation;
     private final InventoryService inventory;
     private final ObjectMapper json;
-    public OrderService(OrderStore orders, CustomerService customers, OrderInventoryAccess allocation, InventoryService inventory, ObjectMapper json, com.operationsflow.audit.application.AuditService audit, com.operationsflow.fulfillment.application.FulfillmentPlanning fulfillment) {
+    public OrderService(OrderStore orders, CustomerService customers, OrderInventoryAccess allocation, InventoryService inventory, ObjectMapper json, com.operationsflow.audit.application.AuditService audit, com.operationsflow.fulfillment.application.FulfillmentPlanning fulfillment, com.operationsflow.messaging.application.OrderEvents events) {
+        this.events = events;
         this.fulfillment = fulfillment;
         this.audit = audit;
         this.orders = orders; this.customers = customers; this.allocation = allocation; this.inventory = inventory; this.json = json;
@@ -49,7 +51,7 @@ public class OrderService {
             UUID id = UUID.randomUUID();
             var stock = allocation.reserve(id,lines.stream().map(l -> new OrderAllocator.Demand(l.skuId(),l.quantity())).toList());
             orders.insert(id,customer,canonical,stock); fulfillment.plan(id); audit.record("ORDER_CREATED",id);
-            var response = orders.get(id); orders.complete(key,json.writeValueAsString(response)); return response;
+            var response = orders.get(id); events.record(id,com.operationsflow.messaging.domain.OrderEvent.Type.ORDER_RESERVED,response.totalUnits()); orders.complete(key,json.writeValueAsString(response)); return response;
         } catch (JsonProcessingException | NoSuchAlgorithmException ex) { throw new IllegalStateException("Cannot serialize order",ex); }
     }
     public View get(UUID id) { return orders.get(id); }
@@ -61,6 +63,6 @@ public class OrderService {
         orders.lock(id); var order = orders.get(id);
         if (!order.status().cancel()) return order;
         inventory.releaseForOrder(id,order.reservationId(),new Terminal(request.reason()));
-        fulfillment.cancel(id); orders.cancel(id,request.reason()); audit.record("ORDER_CANCELLED",id); return orders.get(id);
+        fulfillment.cancel(id); orders.cancel(id,request.reason()); audit.record("ORDER_CANCELLED",id); events.record(id,com.operationsflow.messaging.domain.OrderEvent.Type.ORDER_CANCELLED,order.totalUnits()); return orders.get(id);
     }
 }

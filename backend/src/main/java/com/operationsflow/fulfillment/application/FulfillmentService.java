@@ -20,8 +20,9 @@ import com.operationsflow.shared.domain.BusinessException;
 @Validated
 @Transactional
 public class FulfillmentService {
+    private final com.operationsflow.messaging.application.OrderEvents events;
     private final FulfillmentStore store;private final OrderFulfillmentAccess orders;private final InventoryService inventory;private final AuditService audit;
-    public FulfillmentService(FulfillmentStore store,OrderFulfillmentAccess orders,InventoryService inventory,AuditService audit){this.store=store;this.orders=orders;this.inventory=inventory;this.audit=audit;}
+    public FulfillmentService(FulfillmentStore store,OrderFulfillmentAccess orders,InventoryService inventory,AuditService audit,com.operationsflow.messaging.application.OrderEvents events){this.events=events;this.store=store;this.orders=orders;this.inventory=inventory;this.audit=audit;}
     private TaskView lock(UUID id){UUID order=store.orderId(id);var current=orders.lock(order);if(current.status()==OrderStatus.CANCELLED)throw conflict("Cancelled orders cannot be fulfilled.");return store.task(id);}
     private void version(TaskView task,long expected){if(task.version()!=expected)throw new BusinessException("STALE_VERSION","This task changed. Refresh before continuing.");}
     private void started(UUID order){if(orders.get(order).status()==OrderStatus.RESERVED)orders.transition(order,OrderStatus.PROCESSING);}
@@ -57,7 +58,7 @@ public class FulfillmentService {
         if(order.status()!=OrderStatus.READY_TO_SHIP || tasks.isEmpty() || tasks.stream().anyMatch(t->t.state()!=TaskState.READY_TO_SHIP))throw conflict("All warehouse allocations must have verified packages and prepared shipments before whole-order dispatch.");
         inventory.consumeForOrder(id,order.reservationId(),new Terminal("Whole-order dispatch "+order.orderNumber()));
         for(var task:tasks){store.ship(task.id());audit.record("SHIPMENT_DISPATCHED",task.shipment().id());}
-        orders.transition(id,OrderStatus.SHIPPED);audit.record("ORDER_DISPATCHED",id);
+        orders.transition(id,OrderStatus.SHIPPED);audit.record("ORDER_DISPATCHED",id);events.record(id,com.operationsflow.messaging.domain.OrderEvent.Type.ORDER_SHIPPED,order.totalUnits());
         return new OrderView(id,order.orderNumber(),OrderStatus.SHIPPED,order.customer(),store.tasks(id));
     }
     private BusinessException conflict(String message){return new BusinessException("INVALID_TRANSITION",message);}
