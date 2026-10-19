@@ -209,4 +209,62 @@ class FulfillmentIT extends AuthenticatedTestSupport {
         mvc.perform(put(path).with(authentication(warehouse)).contentType("application/json").content("{\"quantity\":1,\"version\":0}")).andExpect(status().isOk()).andExpect(jsonPath("$.state").value("PICKING"));
         mvc.perform(get("/api/v1/fulfillment/tasks").param("size","101")).andExpect(status().isBadRequest());
     }
+    @Autowired com.operationsflow.orders.application.OrderTimelineService timeline;
+    private com.operationsflow.orders.api.OrderTimeline.Milestone milestone(Fixture f,String code) {
+        return timeline.get(f.order()).milestones().stream().filter(m->m.code().equals(code)).findFirst().orElseThrow();
+    }
+    @Test void timelineUsesPersistedInstantsAndDistinguishesPreparationFromDispatch() {
+        var f=fixture(false);
+        assertThat(milestone(f,"CONFIRMED").occurredAt()).isEqualTo(orders.get(f.order()).createdAt());
+        assertThat(milestone(f,"PREPARING").occurredAt()).isNull();
+        assertThat(milestone(f,"SHIPPED").progress().name()).isEqualTo("PENDING");
+        assertThat(timeline.get(f.order()).milestones()).noneMatch(m->m.code().equals("SHIPMENT_PREPARED"));
+        var picked=picked(task(f));
+        var firstPick=jdbc.queryForObject("select min(created_at) from operationsflow.audit_event where target_id=? and action='PICK_CONFIRMED'",java.sql.Timestamp.class,picked.id()).toInstant();
+        assertThat(milestone(f,"PREPARING").occurredAt()).isEqualTo(firstPick);
+        var packed=fulfillment.pack(picked.id(),verification(picked));
+        assertThat(milestone(f,"PACKED").occurredAt()).isEqualTo(packed.packageRecord().packedAt());
+        var prepared=fulfillment.shipment(packed.id(),new PrepareShipment(packed.version(),"Synthetic carrier","T-"+packed.id()));
+        assertThat(milestone(f,"SHIPMENT_PREPARED").occurredAt()).isEqualTo(prepared.shipment().createdAt());
+        assertThat(milestone(f,"SHIPPED").occurredAt()).isNull();
+        var dispatched=fulfillment.dispatch(f.order());
+        assertThat(milestone(f,"SHIPPED").occurredAt()).isEqualTo(dispatched.tasks().getFirst().shipment().dispatchedAt());
+        assertThat(milestone(f,"SHIPPED").progress().name()).isEqualTo("COMPLETED");
+        reconcile(f,3,0);
+    }
+    @Test void timelineRequiresAllWarehousesAndRetainsConfirmedHistoryAfterCancellation() {
+        var f=fixture(true);prepared(task(f));
+        assertThat(milestone(f,"PACKED").progress().name()).isEqualTo("IN_PROGRESS");
+        assertThat(milestone(f,"PACKED").occurredAt()).isNull();
+        assertThat(milestone(f,"SHIPMENT_PREPARED").detail()).startsWith("1 of 2");
+        orders.cancel(f.order(),new OrderContracts.Cancel("Synthetic cancellation"));
+        assertThat(milestone(f,"SHIPPED").progress().name()).isEqualTo("NOT_REACHED");
+        assertThat(milestone(f,"SHIPPED").occurredAt()).isNull();
+        assertThat(milestone(f,"PREPARING").occurredAt()).isNotNull();
+        var at=jdbc.queryForObject("select created_at from operationsflow.audit_event where target_id=? and action='ORDER_CANCELLED'",java.sql.Timestamp.class,f.order()).toInstant();
+        assertThat(milestone(f,"CANCELLED").occurredAt()).isEqualTo(at);
+        var before=timeline.get(f.order());orders.cancel(f.order(),new OrderContracts.Cancel("Retry"));
+        assertThat(timeline.get(f.order())).isEqualTo(before);reconcile(f,8,0);
+    }
+    @Test void timelineAggregationUsesLastWarehouseCompletionAndDoesNotExposeRolledBackEvents() {
+        var f=fixture(true);ready(f);
+        var tasks=queries.order(f.order()).tasks();
+        assertThat(milestone(f,"PACKED").occurredAt()).isEqualTo(tasks.stream().map(t->t.packageRecord().packedAt()).max(java.time.Instant::compareTo).orElseThrow());
+        var before=timeline.get(f.order());
+        assertThatThrownBy(()->new TransactionTemplate(transactions).execute(tx->{fulfillment.dispatch(f.order());throw new IllegalStateException("Synthetic rollback");})).isInstanceOf(IllegalStateException.class);
+        assertThat(timeline.get(f.order())).isEqualTo(before);
+    }
+    @Test void timelineGetIsReadOnlyAndPreservesRoleRestrictions() throws Exception {
+        var f=fixture(false);long before=events();var order=orders.get(f.order());String path="/api/v1/orders/"+f.order()+"/timeline";
+        for(var role:List.of(Role.ADMIN,Role.SALES_OPERATOR,Role.WAREHOUSE_OPERATOR)) {
+            mvc.perform(get(path).with(authentication(identity(role)))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.milestones[0].code").value("CONFIRMED"))
+                .andExpect(jsonPath("$.customer").doesNotExist()).andExpect(jsonPath("$.trackingReference").doesNotExist());
+        }
+        mvc.perform(get(path).with(anonymous())).andExpect(status().isUnauthorized());
+        mvc.perform(get(path).with(authentication(identity(Role.DEMO_VIEWER)))).andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/orders/"+UUID.randomUUID()+"/timeline")).andExpect(status().isNotFound());
+        assertThat(events()).isEqualTo(before);assertThat(orders.get(f.order())).isEqualTo(order);reconcile(f,8,5);
+    }
+
 }

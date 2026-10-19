@@ -17,7 +17,8 @@ import com.operationsflow.shared.api.PageResponse;
 @Tag(name = "Orders", description = "Unpriced orders with atomic allocation. Independent warehouse preparation with whole-order dispatch. States: RESERVED, PROCESSING, READY_TO_SHIP, SHIPPED, CANCELLED.")
 public class OrderController {
     private final OrderService service;
-    public OrderController(OrderService service) { this.service = service; }
+    private final com.operationsflow.orders.application.OrderTimelineService timeline;
+    public OrderController(OrderService service, com.operationsflow.orders.application.OrderTimelineService timeline) { this.service = service; this.timeline = timeline; }
     @PostMapping
     @Operation(summary = "Create and reserve an order atomically", description = "Requires a UUID Idempotency-Key. Reordered lines replay the original 201 response; a changed payload returns 409. Failed transactions do not retain the key. Allocation prefers one warehouse, then splits by warehouse code. Insufficient stock returns 409 with no effects. Prices, currency and monetary totals are explicitly deferred.")
     public ResponseEntity<View> create(@RequestHeader("Idempotency-Key") UUID key, @Valid @RequestBody Create request) {
@@ -33,6 +34,9 @@ public class OrderController {
     }
     @GetMapping("/{id}") @Operation(summary="Read order snapshots and allocations")
     public View get(@PathVariable UUID id) { return service.get(id); }
+    @GetMapping("/{id}/timeline")
+    @Operation(summary="Read confirmed order milestones", description="ADMIN, SALES_OPERATOR and WAREHOUSE_OPERATOR only. Single database snapshot; timestamps come only from persisted events. Multi-warehouse completion uses the last required record. No customer, destination, tracking or audit actor information. Missing historical timestamps remain null; no carrier delivery confirmation is implied.")
+    public OrderTimeline timeline(@PathVariable UUID id) { return timeline.get(id); }
     @PostMapping("/{id}/cancel")
     @Operation(summary="Cancel an unshipped order", description="Locks order and reservation; releases each allocation exactly once in the same transaction. A repeated cancellation returns the current cancelled order, preserving the first reason. Prepared fulfillment tasks and shipments are cancelled in the same transaction; SHIPPED returns 409.")
     public View cancel(@PathVariable UUID id, @Valid @RequestBody Cancel request) { return service.cancel(id,request); }

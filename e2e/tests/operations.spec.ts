@@ -76,14 +76,36 @@ test('real operational lifecycle and read-only reviewer security', async ({ page
     await expect(page.getByText(`${body.orderNumber} created. Stock reserved. Open the order to see its current status.`)).toBeVisible();
     return body;
   }
+  async function timeline(order: { id: string; orderNumber: string }, code: string, label: string, progress: string) {
+    await nav(page, 'Orders');
+    await page.getByRole('button', { name: `View ${order.orderNumber}`, exact: true }).click();
+    const region = page.getByRole('region', { name: 'Order status timeline' });
+    const row = region.getByRole('listitem').filter({ has: page.getByRole('heading', { name: label, exact: true }) });
+    await expect(row.getByText(progress, { exact: true })).toBeVisible();
+    const data = await (await page.request.get(`/api/v1/orders/${order.id}/timeline`)).json();
+    const persisted = data.milestones.find((m: { code: string }) => m.code === code);
+    if (persisted.occurredAt) await expect(row.locator('time')).toHaveAttribute('datetime', persisted.occurredAt);
+    else await expect(row.locator('time')).toHaveCount(0);
+    await expect(region.getByRole('heading', { name: 'Delivered', exact: true })).toHaveCount(0);
+    return region;
+  }
+  async function openFulfillment() {
+    await nav(page, 'Fulfillment');
+    await page.getByRole('button', { name: `Open ${shipped.orderNumber} ${wh}`, exact: true }).click();
+  }
   await test.step('create and cancel an order; reserved stock is released', async () => {
     cancelled = await order(20); await balance(100, 20, 80);
     await nav(page, 'Orders');
     await page.getByRole('button', { name: `View ${cancelled.orderNumber}`, exact: true }).click();
+    const reserved = await timeline(cancelled, 'CONFIRMED', 'Order Confirmed', 'Confirmed');
+    await expect(reserved.getByRole('heading', { name: 'Shipment Prepared' })).toHaveCount(0);
+    await expect(reserved.getByText('Pending', { exact: true })).toHaveCount(3);
     await page.getByRole('button', { name: 'Cancel order', exact: true }).click();
     await page.getByLabel('Cancellation reason', { exact: true }).fill('Synthetic cancellation');
     await page.getByRole('button', { name: 'Confirm cancellation', exact: true }).click();
     await expect(page.getByText('Order cancelled. Reserved stock released; on-hand stock is unchanged.')).toBeVisible();
+    await timeline(cancelled, 'CANCELLED', 'Cancelled', 'Confirmed');
+    await timeline(cancelled, 'SHIPPED', 'Shipped', 'Not reached');
     await balance(100, 0, 100);
   });
   await test.step('create order and pick, pack and prepare shipment', async () => {
@@ -92,12 +114,20 @@ test('real operational lifecycle and read-only reviewer security', async ({ page
     await page.getByRole('button', { name: `Open ${shipped.orderNumber} ${wh}`, exact: true }).click();
     await page.getByLabel(`Picked ${sku}`, { exact: true }).fill('30');
     await page.getByRole('button', { name: `Confirm ${sku}`, exact: true }).click();
+    await expect(page.getByLabel(`Verified ${sku}`, { exact: true })).toBeVisible();
+    await timeline(shipped, 'PREPARING', 'Preparing Order', 'Confirmed');
+    await openFulfillment();
     await page.getByLabel(`Verified ${sku}`, { exact: true }).fill('30');
     await page.getByRole('button', { name: 'Verify and pack', exact: true }).click();
+    await expect(page.getByLabel('Carrier', { exact: true })).toBeVisible();
+    await timeline(shipped, 'PACKED', 'Packed', 'Confirmed');
+    await openFulfillment();
     await page.getByLabel('Carrier', { exact: true }).fill('Synthetic Carrier');
     await page.getByLabel('Tracking reference', { exact: true }).fill(`TRACK-${suffix}`);
     await page.getByRole('button', { name: 'Create shipment', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Dispatch whole order', exact: true })).toBeVisible();
+    await timeline(shipped, 'SHIPMENT_PREPARED', 'Shipment Prepared', 'Confirmed');
+    await timeline(shipped, 'SHIPPED', 'Shipped', 'Pending');
   });
   await test.step('viewer cannot mutate a dispatchable order through UI or direct API', async () => {
     const email = `viewer-${suffix.toLowerCase()}@example.invalid`, temporary = secret(), password = secret();
@@ -146,7 +176,7 @@ test('real operational lifecycle and read-only reviewer security', async ({ page
       for (const path of ['products', 'warehouses', 'inventory/balances', 'analytics/dashboard',
         'reports/orders', 'reports/inventory', 'reports/low-stock', 'reports/fulfillment', 'reports/movements'])
         expect((await viewer.request.get('/api/v1/' + path)).status()).toBe(200);
-      for (const path of ['users', 'customers', 'orders', 'reports/audit', 'reports/orders/export'])
+      for (const path of ['users', 'customers', 'orders', `orders/${shipped.id}/timeline`, 'reports/audit', 'reports/orders/export'])
         expect((await viewer.request.get('/api/v1/' + path)).status()).toBe(403);
       expect(await (await page.request.get(`/api/v1/orders/${shipped.id}`)).json()).toEqual(before);
       await balance(100, 30, 70);
@@ -163,6 +193,11 @@ test('real operational lifecycle and read-only reviewer security', async ({ page
     await page.getByRole('button', { name: 'Dispatch whole order', exact: true }).click();
     await page.getByRole('button', { name: 'Confirm dispatch', exact: true }).click();
     await expect(page.getByLabel('Fulfillment order details')).toContainText('SHIPPED');
+    const region = await timeline(shipped, 'SHIPPED', 'Shipped', 'Confirmed');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(region.getByRole('heading', { name: 'Shipped', exact: true })).toBeVisible();
+    expect(await region.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+    await page.setViewportSize({ width: 1280, height: 720 });
     await balance(70, 0, 70);
     await nav(page, 'Reports');
     await page.getByLabel('Search report', { exact: true }).fill(shipped.orderNumber);
