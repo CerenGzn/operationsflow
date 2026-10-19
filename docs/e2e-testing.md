@@ -43,7 +43,7 @@ account, production credentials or existing developer database. Run from reposit
 ```sh
 npm ci --prefix e2e
 npm run typecheck --prefix e2e
-(cd e2e && node --experimental-strip-types --test diagnostics.test.mjs && npm audit)
+(cd e2e && node --experimental-strip-types diagnostics.test.mjs && npm audit)
 (cd e2e && npx playwright install --with-deps chromium webkit)
 docker compose --env-file .env.example -f compose.full.yml build
 python3 scripts/e2e-stack.py

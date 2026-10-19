@@ -2,6 +2,9 @@ name: Browser E2E
 on:
   push:
   pull_request:
+concurrency:
+  group: browser-e2e-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -24,7 +27,7 @@ jobs:
         working-directory: e2e
         run: |
           npm run typecheck
-          node --experimental-strip-types --test diagnostics.test.mjs
+          node --experimental-strip-types diagnostics.test.mjs
           npm audit
       - name: Install browser engines
         working-directory: e2e
