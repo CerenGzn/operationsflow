@@ -26,7 +26,8 @@ test('real operational lifecycle and read-only reviewer security', async ({ page
   async function save(kind: string, fields: Record<string, string>) {
     await nav(page, kind === 'product' ? 'Products' : kind === 'warehouse' ? 'Warehouses' : 'Customers');
     await page.getByRole('button', { name: `+ New ${kind}`, exact: true }).click();
-    for (const [label, value] of Object.entries(fields)) await page.getByLabel(label, { exact: false }).fill(value);
+    const editor = page.getByRole('complementary', { name: `${kind} editor`, exact: true });
+    for (const [label, value] of Object.entries(fields)) await editor.getByLabel(label, { exact: false }).fill(value);
     await page.getByRole('button', { name: `Save ${kind}`, exact: true }).click();
     await expect(page.getByText(`${kind[0].toUpperCase() + kind.slice(1)} saved.`, { exact: true })).toBeVisible();
   }
