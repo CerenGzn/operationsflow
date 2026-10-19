@@ -123,4 +123,48 @@ class OutboxIT extends MessagingTestSupport {
             events.record(claim.event().orderId(),claim.event().eventType(),3); return null;
         })).isInstanceOf(DataIntegrityViolationException.class);
     }
+    @Test void lockedExhaustedLeaseDoesNotBlockOtherWork() throws Exception {
+        create(); var expired = outbox.claim().orElseThrow();
+        jdbc.update("update operationsflow.event_outbox set attempts=8,lease_until=now()-interval '1 second' where event_id=?",expired.event().eventId());
+        var pending = create();
+        try (var lock = jdbc.getDataSource().getConnection()) {
+            lock.setAutoCommit(false);
+            try (var statement = lock.prepareStatement("select event_id from operationsflow.event_outbox where event_id=? for update")) {
+                statement.setObject(1,expired.event().eventId()); statement.executeQuery().close();
+                try (var worker = java.util.concurrent.Executors.newSingleThreadExecutor()) {
+                    var claimed = worker.submit(() -> new TransactionTemplate(transactions).execute(tx -> {
+                        jdbc.execute("set local lock_timeout='2s'");
+                        return outbox.claim().orElseThrow();
+                    })).get(10,java.util.concurrent.TimeUnit.SECONDS);
+                    assertThat(claimed.event().orderId()).isEqualTo(pending.id());
+                }
+            } finally { lock.rollback(); }
+        }
+        assertThat(outbox.claim()).isEmpty();
+        assertThat(state(expired.event().eventId())).isEqualTo("FAILED");
+    }
+    @Test void databaseRejectsPartialOrStaleLeases() {
+        create(); var claim = outbox.claim().orElseThrow();
+        assertThatThrownBy(() -> jdbc.update("update operationsflow.event_outbox set lease_token=null where event_id=?",claim.event().eventId()))
+            .isInstanceOf(DataIntegrityViolationException.class);
+        outbox.failed(claim,"UNCONFIRMED");
+        assertThatThrownBy(() -> jdbc.update("update operationsflow.event_outbox set lease_token=? where event_id=?",UUID.randomUUID(),claim.event().eventId()))
+            .isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbc.update("update operationsflow.event_outbox set lease_until=now() where event_id=?",claim.event().eventId()))
+            .isInstanceOf(DataIntegrityViolationException.class);
+    }
+    @Test void failedOutboxInsertionRollsBackBusinessStateAndAudit() {
+        var f = fixture(); long ordersBefore = count("sales_order"), auditBefore = count("audit_event"), movementsBefore = count("inventory_movement");
+        // Inject a real PostgreSQL insert failure at the outbox boundary, not a mock exception.
+        jdbc.execute("alter table operationsflow.event_outbox add constraint test_reject_outbox check (schema_version=99) not valid");
+        try {
+            assertThatThrownBy(() -> orders.create(UUID.randomUUID(),request(f))).isInstanceOf(DataIntegrityViolationException.class);
+            assertThat(count("sales_order")).isEqualTo(ordersBefore);
+            assertThat(count("audit_event")).isEqualTo(auditBefore);
+            assertThat(count("inventory_movement")).isEqualTo(movementsBefore);
+            assertThat(count("event_outbox")).isZero();
+            assertThat(jdbc.queryForObject("select reserved from operationsflow.inventory_balance where sku_id=?",Long.class,f.sku())).isZero();
+        } finally { jdbc.execute("alter table operationsflow.event_outbox drop constraint test_reject_outbox"); }
+    }
+
 }

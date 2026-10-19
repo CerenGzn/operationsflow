@@ -145,4 +145,48 @@ class MessagingBrokerIT extends MessagingTestSupport {
             secured.perform(get("/api/v1/messaging/status").with(authentication(auth))).andExpect(status().isForbidden());
         }
     }
+    @Test void commitFailureIsRetriedAndDeadLetteredBeforeAnyAcknowledgment() throws Exception {
+        create(); var event = outbox.claim().orElseThrow().event();
+        // Sequence increments survive rollback and count real commit attempts, not method calls.
+        jdbc.execute("create sequence operationsflow.test_commit_attempts");
+        jdbc.execute("""
+            create function operationsflow.test_reject_commit() returns trigger language plpgsql as $$
+            begin
+                perform nextval('operationsflow.test_commit_attempts');
+                raise exception 'Synthetic deferred commit failure' using errcode='23514';
+            end;
+            $$
+            """);
+        jdbc.execute("""
+            create constraint trigger test_commit_failure after insert on operationsflow.order_event_ledger
+            deferrable initially deferred for each row execute function operationsflow.test_reject_commit()
+            """);
+        Message dead;
+        try {
+            listeners.start(); sendRaw(json.writeValueAsBytes(event)); dead = awaitDeadLetter();
+            assertThat(jdbc.queryForObject("select last_value from operationsflow.test_commit_attempts",Long.class)).isEqualTo(3);
+            assertThat(count("event_inbox")).isZero(); assertThat(count("order_event_ledger")).isZero();
+        } finally {
+            jdbc.execute("drop trigger test_commit_failure on operationsflow.order_event_ledger");
+            jdbc.execute("drop function operationsflow.test_reject_commit()");
+            jdbc.execute("drop sequence operationsflow.test_commit_attempts");
+        }
+        sendRaw(dead.getBody());
+        await().atMost(Duration.ofSeconds(30)).untilAsserted(() -> assertThat(count("order_event_ledger")).isEqualTo(1));
+        assertThat(count("event_inbox")).isEqualTo(1);
+    }
+    @Test void confirmedPersistentEventSurvivesBrokerApplicationRestart() throws Exception {
+        create(); var event = outbox.claim().orElseThrow().event();
+        assertThat(sender.send(event)).isEqualTo(ConfirmedSender.Result.CONFIRMED);
+        try {
+            assertThat(broker.execInContainer("rabbitmqctl","stop_app").getExitCode()).isZero();
+        } finally {
+            assertThat(broker.execInContainer("rabbitmqctl","start_app").getExitCode()).isZero();
+            connection.resetConnection(); admin.initialize();
+        }
+        listeners.start();
+        await().atMost(Duration.ofSeconds(30)).untilAsserted(() -> assertThat(count("order_event_ledger")).isEqualTo(1));
+        assertThat(jdbc.queryForObject("select event_id from operationsflow.order_event_ledger",UUID.class)).isEqualTo(event.eventId());
+    }
+
 }

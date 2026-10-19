@@ -20,7 +20,8 @@ CREATE TABLE operationsflow.event_outbox (
     published_at timestamptz,
     last_error varchar(40),
     UNIQUE (order_id,event_type),
-    CHECK ((state = 'IN_FLIGHT') = (lease_token IS NOT NULL AND lease_until IS NOT NULL)),
+    CHECK ((state = 'IN_FLIGHT' AND lease_token IS NOT NULL AND lease_until IS NOT NULL)
+        OR (state <> 'IN_FLIGHT' AND lease_token IS NULL AND lease_until IS NULL)),
     CHECK ((state = 'PUBLISHED') = (published_at IS NOT NULL))
 );
 CREATE INDEX outbox_pending_idx ON operationsflow.event_outbox(next_attempt_at,event_id) WHERE state='PENDING';

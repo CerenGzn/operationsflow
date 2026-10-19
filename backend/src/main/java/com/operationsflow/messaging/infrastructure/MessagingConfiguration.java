@@ -60,6 +60,8 @@ public class MessagingConfiguration {
     @Bean SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory(CachingConnectionFactory factory, Environment env) {
         var listener = new SimpleRabbitListenerContainerFactory();
         listener.setConnectionFactory(factory);
+        // Listener returns only after EventConsumer's database transaction commits.
+        listener.setAcknowledgeMode(AcknowledgeMode.AUTO);
         listener.setConcurrentConsumers(1); listener.setPrefetchCount(10);
         listener.setAutoStartup(env.getProperty("operationsflow.messaging.listener-enabled", Boolean.class, true));
         listener.setDefaultRequeueRejected(false); listener.setMissingQueuesFatal(false);

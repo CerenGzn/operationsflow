@@ -15,7 +15,14 @@ public class OutboxStore {
     @Transactional
     public Optional<Claim> claim(){
         // Expired final attempts are visible failures, not silently stranded leases.
-        jdbc.update("update operationsflow.event_outbox set state='FAILED',lease_token=null,lease_until=null,last_error='LEASE_EXHAUSTED' where state='IN_FLIGHT' and lease_until<=clock_timestamp() and attempts=8");
+        jdbc.update("""
+            update operationsflow.event_outbox o
+            set state='FAILED',lease_token=null,lease_until=null,last_error='LEASE_EXHAUSTED'
+            from (select event_id from operationsflow.event_outbox
+                where state='IN_FLIGHT' and lease_until<=clock_timestamp() and attempts=8
+                order by lease_until,event_id for update skip locked limit 100) expired
+            where o.event_id=expired.event_id
+            """);
         UUID token=UUID.randomUUID();
         var rows=jdbc.query("""
             update operationsflow.event_outbox o set state='IN_FLIGHT',lease_token=?,

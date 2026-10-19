@@ -81,6 +81,9 @@ random lease token and a 30-second expiry. Attempts increment when claimed. Netw
 I/O happens after commit, not while holding row locks. Updates are fenced by the
 lease token, so a stale worker cannot mark another worker's attempt successful.
 An expired lease can be reclaimed; an expired eighth attempt becomes `FAILED`.
+Final-attempt cleanup also uses `SKIP LOCKED` and a 100-row batch so a locked
+expired row cannot stall other workers before they reach the normal claim.
+The database requires both lease fields for IN_FLIGHT and neither otherwise.
 
 A mandatory persistent message must receive a positive correlated publisher
 confirmation **and no return** before it becomes `PUBLISHED`. Nacks, returns,
@@ -198,7 +201,10 @@ cd backend
 ```
 
 Normal verification includes all existing tests, PostgreSQL outbox/consumer tests,
-V8→V9 migration tests, contract/confirm tests and profile isolation tests. The
+V8→V9 migration tests with populated business tables, contract/confirm tests and
+profile isolation tests. A full `demo,messaging` application context uses
+Testcontainers connection details (never a cloud database), verifies absence of
+all broker infrastructure, and creates/cancels an order without broker credentials. The
 `messaging-tests` profile selects `*BrokerIT` for Failsafe, while unit tests still
 run. The separate GitHub Actions **Messaging integration** job runs PostgreSQL and
 RabbitMQ Testcontainers. It must not silently skip when Docker is unavailable.
