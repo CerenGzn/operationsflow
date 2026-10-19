@@ -50,7 +50,7 @@ business effect, not exactly-once network delivery.
 | Frontend | React 19, TypeScript, Vite; React hooks and Fetch for API state |
 | Database | PostgreSQL 17, Flyway migrations V1–V9 |
 | API | REST, structured problem responses, OpenAPI / springdoc |
-| Testing | JUnit 5, Spring Boot Test, PostgreSQL/RabbitMQ Testcontainers, Vitest, Testing Library |
+| Testing | JUnit 5, Spring Boot Test, PostgreSQL/RabbitMQ Testcontainers, Vitest, Testing Library, Playwright |
 | Tooling | Docker Compose for PostgreSQL or the full stack, GitHub Actions, npm lockfile and security audits |
 
 Exact dependencies live in [backend/pom.xml](backend/pom.xml) and
@@ -238,6 +238,19 @@ Actions run, test counts, commands, and unverified scenarios. The badge tracks
 `main`, not necessarily a feature branch. CI preserves backend, frontend, Compose,
 and both npm audit checks; it does not deploy the application.
 
+### Isolated browser E2E
+
+[Browser E2E workflow](https://github.com/CerenGzn/operationsflow/actions/workflows/e2e.yml)
+adds real administrator and DEMO_VIEWER browser journeys, catalog/customer creation,
+receipt, reservation/cancellation, pick/pack/dispatch, stock deduction and reporting.
+Chromium and WebKit use synthetic, disposable data; they never test the public demo.
+See [setup, coverage, safe diagnostics and limitations](docs/e2e-testing.md).
+Successful exact-main Browser E2E is required by release-readiness verification in
+addition to existing application CI. This does not deploy anything or replace the
+owner's live verification. [Browser CI run 39323254677](https://github.com/CerenGzn/operationsflow/actions/runs/39323254677)
+passed both complete journeys on 2026-10-19 at implementation commit `26b2c551f3c6c3872ecf93fe49f0cb00ad36cab5`,
+with no retries; final documentation-commit checks are linked in the draft PR.
+
 ## Security and Demo Limitations
 
 - No public signup, default credentials, real customer fixtures, or published demo accounts.
@@ -279,21 +292,9 @@ is deferred” in earlier milestones describe that stage, not the current applic
 
 ## Roadmap / Future Enhancements
 
-Planned, **not implemented**: complete
-broader browser E2E coverage; separately approved deployment automation (readiness checks
+Planned, **not implemented**: broader browser E2E coverage; separately approved deployment automation (readiness checks
 are implemented, deployment stays manual) and image supply-chain
 hardening; durable sessions and distributed throttling if scaling is needed;
 measured query/locking optimization; and separately designed pricing, partial
 shipments, returns and retention policies. Expanded live verification remains
 necessary; this project makes no high-availability or customer-usage claim.
-
-### Isolated browser E2E
-
-[Browser E2E workflow](https://github.com/CerenGzn/operationsflow/actions/workflows/e2e.yml)
-adds real administrator and DEMO_VIEWER browser journeys, catalog/customer creation,
-receipt, reservation/cancellation, pick/pack/dispatch, stock deduction and reporting.
-Chromium and WebKit use synthetic, disposable data; they never test the public demo.
-See [setup, coverage, safe diagnostics and limitations](docs/e2e-testing.md).
-Successful exact-main Browser E2E is required by release-readiness verification in
-addition to existing application CI. This does not deploy anything or replace the
-owner's live verification. Final measured results belong to the feature PR's CI links.

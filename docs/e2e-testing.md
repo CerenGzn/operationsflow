@@ -68,7 +68,7 @@ On failure, CI retains only `e2e/safe-artifacts/` for three days:
 - Screenshots mask all inputs, textareas, selects, account identity and authentication
   forms. Viewer failures capture the viewer page as well as the administrator page.
 - `action-trace.json` is a deliberately reduced Playwright step timeline: category,
-  source line, duration and failure flag. Match source lines to the tested commit.
+  source line, duration and failure flag/category. Match source lines to the tested commit.
   No request headers/bodies, cookies, DOM snapshots, locators, error strings, sources
   or account values are serialized. A sentinel test verifies the reporter omits
   sensitive strings from logs and the timeline.
@@ -104,6 +104,17 @@ read-only evidence and never authorizes or performs deployment. See
 
 ## Verification evidence
 
-Record the exact final feature-branch CI links and results in the pull request.
-Local Codex dependency networking and Docker socket access may be unavailable; offline
-policy/diagnostic tests are not a substitute for the actual hosted browser run.
+Verified on 2026-10-19 at implementation commit
+`26b2c551f3c6c3872ecf93fe49f0cb00ad36cab5`:
+[Browser E2E run 39323254677](https://github.com/CerenGzn/operationsflow/actions/runs/39323254677)
+passed both full lifecycle cases: Chromium 9.38 seconds and WebKit 23.93 seconds,
+with zero retries/skips. These are case durations, excluding dependency installation,
+image builds and stack startup. The same job passed type checking, both diagnostic
+reporter tests and npm audit (zero findings). Memory consumption was not profiled.
+
+The final documentation commit's CI links are recorded separately in the draft PR.
+This is isolated CI evidence, not live Render evidence. Local Codex networking and
+Docker daemon access were blocked; local offline policy tests (24), diagnostic tests
+(2), Compose configuration, YAML/permission checks and documentation link checks
+passed. Actual browsers and PostgreSQL ran in GitHub Actions, not in the restricted
+local executor.
