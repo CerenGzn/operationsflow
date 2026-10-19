@@ -141,7 +141,7 @@ details { margin-top: 8px; font-size: .75rem; }summary { cursor: pointer; color:
 .timeline-heading .eyebrow { margin: 0; }
 .timeline-current { display: flex; justify-content: space-between; gap: .75rem; flex-wrap: wrap; padding: .75rem; border-radius: 8px; background: #e8eef8; color: #203b66; }
 .order-details .timeline-stages { list-style: none; padding: 0; margin: 1.25rem 0 0; }
-.timeline-stage { position: relative; display: grid; grid-template-columns: 1.75rem minmax(0, 1fr); gap: .65rem; padding-bottom: 1.4rem; }
+.order-details .timeline-stage { border-bottom: 0; position: relative; display: grid; grid-template-columns: 1.75rem minmax(0, 1fr); gap: .65rem; padding: 0 0 1.4rem; }
 .timeline-stage:not(:last-child)::before { content: ''; position: absolute; top: 1.75rem; bottom: .15rem; left: .8rem; border-left: 2px solid #cbd5e1; }
 .timeline-marker { width: 1.65rem; height: 1.65rem; display: grid; place-items: center; border: 1px solid #64748b; border-radius: 50%; background: white; color: #475569; font-weight: 700; }
 .timeline-completed .timeline-marker { color: #fff; background: #176044; border-color: #176044; }
