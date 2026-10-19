@@ -131,7 +131,11 @@ class MessagingBrokerIT extends MessagingTestSupport {
     }
     @Test void diagnosticsAreAdminOnlyAndDoNotExposeEventPayloads() throws Exception {
         create();
-        mvc.perform(get("/api/v1/messaging/status")).andExpect(status().isOk());
+        mvc.perform(get("/api/v1/messaging/status")).andExpect(status().isOk())
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.outbox.PENDING").value(1))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.processedEvents").value(0))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.payload").doesNotExist());
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
         var secured = MockMvcBuilders.webAppContextSetup(authContext).apply(springSecurity()).build();
         secured.perform(get("/api/v1/messaging/status")).andExpect(status().isUnauthorized());
         for (var role : List.of(Role.SALES_OPERATOR,Role.WAREHOUSE_OPERATOR,Role.DEMO_VIEWER)) {
