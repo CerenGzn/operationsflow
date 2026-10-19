@@ -203,3 +203,46 @@ class TransportTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class ReleaseTests(unittest.TestCase):
+    def fixture(self):
+        primary, browser = Fixture(), Fixture()
+        browser.workflow['path'] = '.github/workflows/e2e.yml'
+        browser.run['path'] = '.github/workflows/e2e.yml'
+        browser.jobs = [dict(browser.jobs[0], name='browser-e2e')]
+        class Combined:
+            selected = primary
+            def get(self, path):
+                if path == '/actions/workflows/ci.yml': self.selected = primary
+                if path == '/actions/workflows/e2e.yml':
+                    self.selected = browser
+                    path = '/actions/workflows/ci.yml'
+                return self.selected.get(path)
+        return Combined(), primary, browser
+
+    def test_both_workflows_required(self):
+        api, _, _ = self.fixture()
+        result = r.verify_release(api, SHA, SHA)
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[1]['jobs'], ['browser-e2e'])
+
+    def test_browser_failure_pending_skipped_or_wrong_provenance_refused(self):
+        for key, value in [('conclusion','failure'), ('conclusion','skipped'),
+                           ('status','in_progress'), ('head_sha',OTHER), ('event','pull_request')]:
+            with self.subTest(key=key, value=value):
+                api, _, browser = self.fixture(); browser.run[key] = value
+                with self.assertRaises(r.NotReady): r.verify_release(api, SHA, SHA)
+        for mutate in [lambda b: b.jobs.clear(), lambda b: b.extra_runs.append(copy.deepcopy(b.run)),
+                       lambda b: b.jobs[0].update(conclusion='skipped')]:
+            api, _, browser = self.fixture(); mutate(browser)
+            with self.assertRaises(r.NotReady): r.verify_release(api, SHA, SHA)
+
+    def test_primary_rerun_during_browser_verification_refused(self):
+        api, primary, browser = self.fixture()
+        def change(b, path): primary.run['status'] = 'in_progress'
+        browser.change = change
+        with self.assertRaises(r.NotReady): r.verify_release(api, SHA, SHA)
+
+    def test_no_optional_bypass_for_browser_workflow(self):
+        self.assertEqual(r.RELEASE_WORKFLOWS, ((r.WORKFLOW, r.REQUIRED_JOBS),
+            ('.github/workflows/e2e.yml', frozenset({'browser-e2e'}))))

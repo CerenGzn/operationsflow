@@ -1,0 +1,42 @@
+name: Browser E2E
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  browser-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+      - name: Install locked browser test dependencies
+        working-directory: e2e
+        run: npm ci
+      - name: Typecheck and audit browser tests
+        working-directory: e2e
+        run: |
+          npm run typecheck
+          npm audit
+      - name: Install browser engines
+        working-directory: e2e
+        run: npx playwright install --with-deps chromium webkit
+      - name: Build real application images without publishing
+        run: docker compose --env-file .env.example -f compose.full.yml build
+      - name: Run real browsers against isolated application and PostgreSQL
+        run: python3 scripts/e2e-stack.py
+      - name: Retain only safe failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-diagnostics
+          path: e2e/safe-artifacts/
+          if-no-files-found: ignore
+          retention-days: 3

@@ -84,10 +84,10 @@ def main_tip(api):
     return ref["object"]["sha"]
 
 
-def validate_run(run, sha, workflow_id):
+def validate_run(run, sha, workflow_id, workflow_path=WORKFLOW):
     require(run.get("head_sha") == sha and run.get("head_branch") == "main", "CI SHA/branch mismatch.")
     require(run.get("event") == "push", "Only main push CI is accepted; PR/dispatch evidence refused.")
-    require(run.get("workflow_id") == workflow_id and run.get("path") == WORKFLOW, "Wrong CI workflow.")
+    require(run.get("workflow_id") == workflow_id and run.get("path") == workflow_path, "Wrong CI workflow.")
     require(run.get("repository", {}).get("full_name") == REPOSITORY and
             run.get("head_repository", {}).get("full_name") == REPOSITORY, "Foreign repository CI refused.")
     require(run.get("status") == "completed" and run.get("conclusion") == "success",
@@ -95,28 +95,28 @@ def validate_run(run, sha, workflow_id):
     require(type(run.get("run_attempt")) is int and run["run_attempt"] > 0, "Missing CI attempt.")
 
 
-def verify(api, sha, executing_sha):
+def verify(api, sha, executing_sha, workflow_path=WORKFLOW, required_jobs=REQUIRED_JOBS):
     require(bool(re.fullmatch(r"[0-9a-f]{40}", sha)), "Enter a full lowercase 40-character commit SHA.")
     require(sha == executing_sha, "Selected SHA must match this workflow's main snapshot; start a new run.")
     require(main_tip(api) == sha, "Only the current main tip is eligible; stale/PR/foreign SHA refused.")
-    workflow = api.get("/actions/workflows/ci.yml")
-    require(workflow.get("path") == WORKFLOW and workflow.get("state") == "active" and
+    workflow = api.get("/actions/workflows/" + workflow_path.rsplit("/", 1)[1])
+    require(workflow.get("path") == workflow_path and workflow.get("state") == "active" and
             type(workflow.get("id")) is int, "CI workflow is missing, inactive or ambiguous.")
     query = urlencode({"branch": "main", "event": "push", "head_sha": sha})
     path = f"/actions/workflows/{workflow['id']}/runs?{query}"
     runs = collection(api, path, "workflow_runs")
     require(len(runs) == 1, "Expected exactly one main push CI run for this SHA; missing/ambiguous evidence.")
     run = runs[0]
-    validate_run(run, sha, workflow["id"])
+    validate_run(run, sha, workflow["id"], workflow_path)
     run_id = run.get("id")
     require(type(run_id) is int and run_id > 0, "Invalid CI run ID.")
     # Explicit latest attempt prevents an older successful attempt hiding a rerun.
     current = api.get(f"/actions/runs/{run_id}")
-    validate_run(current, sha, workflow["id"])
+    validate_run(current, sha, workflow["id"], workflow_path)
     require(current.get("id") == run_id and current["run_attempt"] == run["run_attempt"], "CI attempt changed; rerun readiness.")
     attempt = current["run_attempt"]
     jobs = collection(api, f"/actions/runs/{run_id}/attempts/{attempt}/jobs", "jobs")
-    require(Counter(job.get("name") for job in jobs) == Counter(REQUIRED_JOBS),
+    require(Counter(job.get("name") for job in jobs) == Counter(required_jobs),
             "Required CI jobs missing, duplicated or unexpected; review policy before release.")
     require(len({job.get("id") for job in jobs}) == len(jobs), "Duplicate job IDs.")
     for job in jobs:
@@ -129,13 +129,25 @@ def verify(api, sha, executing_sha):
     latest_runs = collection(api, path, "workflow_runs")
     require(len(latest_runs) == 1 and latest_runs[0].get("id") == run_id,
             "CI evidence changed during verification; rerun.")
-    validate_run(latest_runs[0], sha, workflow["id"])
+    validate_run(latest_runs[0], sha, workflow["id"], workflow_path)
     require(latest_runs[0].get("run_attempt") == attempt, "CI rerun started; readiness refused.")
     final = api.get(f"/actions/runs/{run_id}")
-    validate_run(final, sha, workflow["id"])
+    validate_run(final, sha, workflow["id"], workflow_path)
     require(final.get("id") == run_id and final["run_attempt"] == attempt, "CI changed during verification.")
     require(main_tip(api) == sha, "Main moved during verification; start a new run.")
-    return {"sha": sha, "run_id": run_id, "attempt": attempt, "jobs": sorted(REQUIRED_JOBS)}
+    return {"sha": sha, "run_id": run_id, "attempt": attempt, "jobs": sorted(required_jobs)}
+
+
+RELEASE_WORKFLOWS = ((WORKFLOW, REQUIRED_JOBS),
+                     (".github/workflows/e2e.yml", frozenset({"browser-e2e"})))
+
+
+def verify_release(api, sha, executing_sha):
+    evidence = [verify(api, sha, executing_sha, path, jobs) for path, jobs in RELEASE_WORKFLOWS]
+    # Recollect every workflow after the first pass, catching cross-workflow reruns.
+    final = [verify(api, sha, executing_sha, path, jobs) for path, jobs in RELEASE_WORKFLOWS]
+    require(final == evidence, "Release evidence changed; rerun readiness.")
+    return evidence
 
 
 def summary(result):
@@ -156,9 +168,9 @@ def main():
         require(os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch" and
                 os.environ.get("GITHUB_REF") == "refs/heads/main" and
                 os.environ.get("GITHUB_REPOSITORY") == REPOSITORY, "Manual main-only repository context required.")
-        result = verify(GitHub(os.environ.get("GH_TOKEN", "")), os.environ.get("RELEASE_SHA", ""),
+        results = verify_release(GitHub(os.environ.get("GH_TOKEN", "")), os.environ.get("RELEASE_SHA", ""),
                         os.environ.get("GITHUB_SHA", ""))
-        text = summary(result)
+        text = "\n".join(summary(result) for result in results)
         code = 0
     except NotReady as error:
         text = f"# NOT READY — no deployment\n\n{error}\n\nNo approval or deployment has occurred.\n"

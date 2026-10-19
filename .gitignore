@@ -19,3 +19,9 @@ frontend/coverage/
 # Python release-readiness test caches
 __pycache__/
 *.pyc
+
+# Isolated browser tests: never retain raw authenticated browser state.
+e2e/node_modules/
+e2e/.private-results/
+e2e/safe-artifacts/
+e2e/.raw-traces/
