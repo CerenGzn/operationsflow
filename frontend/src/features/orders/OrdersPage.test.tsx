@@ -11,6 +11,7 @@ const response = (body: unknown, status = 200) => ({ ok: status < 400, status, j
 function mockApi(mutation?: (url: string, options: RequestInit) => unknown) {
   const mock = vi.fn().mockImplementation(async (url: string, options?: RequestInit) => {
     if (options?.method === 'POST' && mutation) return mutation(url, options);
+    if (url.endsWith('/timeline')) return response({ orderId: 'o1', status: 'RESERVED', milestones: [] });
     if (url.includes('/inventory/availability?')) return response({ skuId: 's1', totalAvailable: 8, balances: page([{ warehouseId: 'w1', warehouseCode: 'BER-01', onHand: 10, reserved: 2, available: 8 }]) });
     if (url.includes('/customers?')) return response(page([customer]));
     if (url.includes('/products?')) return response(page([product]));

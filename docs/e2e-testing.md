@@ -118,3 +118,7 @@ Docker daemon access were blocked; local offline policy tests (24), diagnostic t
 (2), Compose configuration, YAML/permission checks and documentation link checks
 passed. Actual browsers and PostgreSQL ran in GitHub Actions, not in the restricted
 local executor.
+
+## Milestone 16 timeline assertions
+
+The existing real-browser lifecycle now checks confirmed creation, pending preparation, first picking, packing, recorded shipment preparation, pending dispatch, cancellation and completed dispatch in Orders details. Displayed timestamps are compared with the real timeline API. The suite checks a 390 px viewport and direct DEMO_VIEWER denial; existing stock and role checks remain intact. These automated isolated-environment checks do not establish deployment or verification of the timeline on Render.

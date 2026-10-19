@@ -298,3 +298,9 @@ hardening; durable sessions and distributed throttling if scaling is needed;
 measured query/locking optimization; and separately designed pricing, partial
 shipments, returns and retention policies. Expanded live verification remains
 necessary; this project makes no high-availability or customer-usage claim.
+
+### Order status timeline (Milestone 16 source)
+
+Employee order details include a responsive timeline of confirmed reservation, first picking activity, packing, recorded shipment preparation, dispatch and cancellation. Pending and partial warehouse progress remain distinct; timestamps come only from persisted records. Dispatch is not delivery confirmation. DEMO_VIEWER retains sanitized read-only reports and cannot open raw order timelines.
+
+See [timeline semantics and permissions](docs/order-timeline.md). This feature is implemented in GitHub source, **not claimed deployed on the live Render demo**. Its backend, component and real-browser checks are separate from the owner's previously verified live workflows.
