@@ -25,7 +25,7 @@ describe('order timeline', () => {
   ])('renders persisted %s / %s confirmation', async (status,code,label) => {
     api([stage(code,label,'COMPLETED',at)],status);
     render(<OrderTimeline orderId="o1" revision={status} />);
-    const heading=await screen.findByRole('heading',{name:label,exact:true});
+    const heading=await screen.findByRole('heading',{name:label});
     expect(within(heading.closest('li')!).getByText('Confirmed')).toBeInTheDocument();
     expect(screen.queryByText('Delivered')).not.toBeInTheDocument();
   });
