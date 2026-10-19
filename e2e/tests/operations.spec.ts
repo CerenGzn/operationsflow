@@ -43,8 +43,8 @@ test('real operational lifecycle and read-only reviewer security', async ({ page
   });
   async function balance(onHand: number, reserved: number, available: number) {
     await nav(page, 'Inventory');
-    await page.getByLabel(/^Warehouse(?:\s|$)/).selectOption(warehouseId);
-    await page.getByLabel(/^SKU(?:\s|$)/).selectOption(skuId);
+    await page.getByLabel(/^Warehouse/).selectOption(warehouseId);
+    await page.getByLabel(/^SKU/).selectOption(skuId);
     const row = page.getByRole('row').filter({ hasText: sku });
     await expect(row).toHaveCount(1);
     await expect(row.getByRole('cell').nth(2)).toHaveText(String(onHand));
@@ -53,8 +53,8 @@ test('real operational lifecycle and read-only reviewer security', async ({ page
   }
   await test.step('receipt produces 100 on hand, zero reserved and 100 available', async () => {
     await nav(page, 'Inventory');
-    await page.getByLabel(/^Warehouse(?:\s|$)/).selectOption(warehouseId);
-    await page.getByLabel(/^SKU(?:\s|$)/).selectOption(skuId);
+    await page.getByLabel(/^Warehouse/).selectOption(warehouseId);
+    await page.getByLabel(/^SKU/).selectOption(skuId);
     await page.getByLabel('Quantity', { exact: true }).fill('100');
     await page.getByLabel('Reason', { exact: true }).fill('Synthetic browser receipt');
     await page.getByRole('button', { name: 'Receive stock', exact: true }).click();
@@ -64,8 +64,8 @@ test('real operational lifecycle and read-only reviewer security', async ({ page
   async function order(quantity: number) {
     await nav(page, 'Orders');
     await page.getByRole('button', { name: '+ New order', exact: true }).click();
-    await page.getByLabel(/^Customer(?:\s|$)/).selectOption(customerId);
-    await page.getByLabel(/^SKU(?:\s|$)/).selectOption(skuId);
+    await page.getByLabel(/^Customer/).selectOption(customerId);
+    await page.getByLabel(/^SKU/).selectOption(skuId);
     await expect(page.getByLabel('Stock availability')).toContainText('100 available units');
     await page.getByLabel('Quantity', { exact: true }).fill(String(quantity));
     await page.getByRole('button', { name: 'Add line', exact: true }).click();
@@ -166,7 +166,7 @@ test('real operational lifecycle and read-only reviewer security', async ({ page
     await balance(70, 0, 70);
     await nav(page, 'Reports');
     await page.getByLabel('Search report', { exact: true }).fill(shipped.orderNumber);
-    await page.getByLabel(/^Record status(?:\s|$)/).selectOption('SHIPPED');
+    await page.getByLabel(/^Record status/).selectOption('SHIPPED');
     await page.getByRole('button', { name: 'Apply report filters' }).click();
     await expect(page.getByRole('heading', { name: '1 matching records', exact: true })).toBeVisible();
     await expect(page.getByRole('table')).toContainText(shipped.orderNumber);
